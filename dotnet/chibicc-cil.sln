@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33110.190
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "chibicc-cli", "chibicc-cli\chibicc-cli.csproj", "{8CE23625-CBF7-439A-89E3-327375D74F2D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8DC2FCF2-FC50-404C-AB7B-A106C50FF5FE}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		build-nupkg.bat = build-nupkg.bat
+		build-nupkg.sh = build-nupkg.sh
+		Directory.Build.props = Directory.Build.props
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "chibicc", "chibicc\chibicc.csproj", "{AFCAA175-04B7-4DC3-BDF3-A54B01A14CC9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8CE23625-CBF7-439A-89E3-327375D74F2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8CE23625-CBF7-439A-89E3-327375D74F2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8CE23625-CBF7-439A-89E3-327375D74F2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8CE23625-CBF7-439A-89E3-327375D74F2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFCAA175-04B7-4DC3-BDF3-A54B01A14CC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFCAA175-04B7-4DC3-BDF3-A54B01A14CC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFCAA175-04B7-4DC3-BDF3-A54B01A14CC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFCAA175-04B7-4DC3-BDF3-A54B01A14CC9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {680F1941-E493-46F7-BEBA-B835D06F451D}
+	EndGlobalSection
+EndGlobal
