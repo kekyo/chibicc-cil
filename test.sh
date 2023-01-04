@@ -4,8 +4,8 @@ assert() {
   input="$2"
 
   ./chibicc "$input" > tmp.s || exit
-  gcc -static -o tmp tmp.s
-  ./tmp
+  ilasm -exe -output:tmp.exe tmp.s
+  ./tmp.exe
   actual="$?"
 
   if [ "$actual" = "$expected" ]; then
