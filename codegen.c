@@ -1,5 +1,15 @@
 #include "chibicc.h"
 
+static void gen_addr(Node *node) {
+  if (node->kind == ND_VAR) {
+    int offset = node->name - 'a';
+    printf("    ldloca %d\n", offset);
+    return;
+  }
+
+  error("not an lvalue");
+}
+
 static void gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NUM:
@@ -8,6 +18,17 @@ static void gen_expr(Node *node) {
   case ND_NEG:
     gen_expr(node->lhs);
     printf("    neg\n");
+    return;
+  case ND_VAR:
+    gen_addr(node);
+    printf("    ldind.i4\n");
+    return;
+  case ND_ASSIGN:
+    gen_addr(node->lhs);
+    printf("    dup\n");
+    gen_expr(node->rhs);
+    printf("    stind.i4\n");
+    printf("    ldind.i4\n");
     return;
   }
 
@@ -67,6 +88,12 @@ void codegen(Node *node) {
   printf("  .method public hidebysig static int32 Main(string[] args) cil managed\n");
   printf("  {\n");
   printf("    .entrypoint\n");
+  printf("    .locals init (\n");
+  for (int i = 0; i <= ('z' - 'a' - 1); i++) {
+    printf("      [%d] int32,\n", i);
+  }
+  printf("      [25] int32\n");
+  printf("    )\n");
 
   for (Node *n = node; n; n = n->next) {
     gen_stmt(n);
