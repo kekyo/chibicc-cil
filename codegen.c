@@ -48,6 +48,15 @@ static void gen_expr(Node *node) {
   error("invalid expression");
 }
 
+static void gen_stmt(Node *node) {
+  if (node->kind == ND_EXPR_STMT) {
+    gen_expr(node->lhs);
+    return;
+  }
+
+  error("invalid statement");
+}
+
 void codegen(Node *node) {
   printf(".assembly Test\n");
   printf("{\n");
@@ -59,7 +68,12 @@ void codegen(Node *node) {
   printf("  {\n");
   printf("    .entrypoint\n");
 
-  gen_expr(node);
+  for (Node *n = node; n; n = n->next) {
+    gen_stmt(n);
+    if (n->next) {
+      printf("    pop\n");
+    }
+  }
   printf("    ret\n");
   printf("  }\n");
   printf("}\n");
