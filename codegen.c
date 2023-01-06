@@ -1,9 +1,10 @@
 #include "chibicc.h"
 
+// Compute the absolute address of a given node.
+// It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
   if (node->kind == ND_VAR) {
-    int offset = node->name - 'a';
-    printf("    ldloca %d\n", offset);
+    printf("    ldloca %d\n", node->var->offset);
     return;
   }
 
@@ -78,7 +79,19 @@ static void gen_stmt(Node *node) {
   error("invalid statement");
 }
 
-void codegen(Node *node) {
+// Assign offsets to local variables.
+static void assign_lvar_offsets(Function *prog) {
+  int offset = 0;
+  for (Obj *var = prog->locals; var; var = var->next) {
+    var->offset = offset;
+    offset++;
+  }
+  prog->stack_size = offset;
+}
+
+void codegen(Function *prog) {
+  assign_lvar_offsets(prog);
+
   printf(".assembly Test\n");
   printf("{\n");
   printf("}\n");
@@ -88,14 +101,17 @@ void codegen(Node *node) {
   printf("  .method public hidebysig static int32 Main(string[] args) cil managed\n");
   printf("  {\n");
   printf("    .entrypoint\n");
-  printf("    .locals init (\n");
-  for (int i = 0; i <= ('z' - 'a' - 1); i++) {
-    printf("      [%d] int32,\n", i);
+  if (prog->stack_size >= 1) {
+    printf("    .locals init (\n");
+    int i;
+    for (i = 0; i < prog->stack_size; i++) {
+      printf("      [%d] int32,\n", i);
+    }
+    printf("      [%d] int32\n", i);
+    printf("    )\n");
   }
-  printf("      [25] int32\n");
-  printf("    )\n");
 
-  for (Node *n = node; n; n = n->next) {
+  for (Node *n = prog->body; n; n = n->next) {
     gen_stmt(n);
     if (n->next) {
       printf("    pop\n");
