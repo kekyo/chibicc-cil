@@ -73,12 +73,8 @@ static void gen_expr(Node *node) {
 static void gen_stmt(Node *node) {
   switch (node->kind) {
   case ND_BLOCK:
-    for (Node *n = node->body; n; n = n->next) {
+    for (Node *n = node->body; n; n = n->next)
       gen_stmt(n);
-      if (n->next) {
-        printf("    pop\n");
-      }
-    }
     return;
   case ND_RETURN:
     gen_expr(node->lhs);
@@ -86,6 +82,7 @@ static void gen_stmt(Node *node) {
     return;
   case ND_EXPR_STMT:
     gen_expr(node->lhs);
+    printf("    pop\n");
     return;
   }
 
