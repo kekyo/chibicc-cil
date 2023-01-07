@@ -94,7 +94,8 @@ static void gen_stmt(Node *node) {
   }
   case ND_FOR: {
     int c = count();
-    gen_stmt(node->init);
+    if (node->init)
+      gen_stmt(node->init);
     printf("_L_begin_%d:\n", c);
     if (node->cond) {
       gen_expr(node->cond);
