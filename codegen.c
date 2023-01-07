@@ -72,6 +72,14 @@ static void gen_expr(Node *node) {
 
 static void gen_stmt(Node *node) {
   switch (node->kind) {
+  case ND_BLOCK:
+    for (Node *n = node->body; n; n = n->next) {
+      gen_stmt(n);
+      if (n->next) {
+        printf("    pop\n");
+      }
+    }
+    return;
   case ND_RETURN:
     gen_expr(node->lhs);
     printf("    br _L_return\n");
@@ -116,12 +124,8 @@ void codegen(Function *prog) {
     printf("    )\n");
   }
 
-  for (Node *n = prog->body; n; n = n->next) {
-    gen_stmt(n);
-    if (n->next) {
-      printf("    pop\n");
-    }
-  }
+  gen_stmt(prog->body);
+
   printf("_L_return:\n");
   printf("    ret\n");
   printf("  }\n");
