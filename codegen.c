@@ -1,5 +1,10 @@
 #include "chibicc.h"
 
+static int count(void) {
+  static int i = 1;
+  return i++;
+}
+
 // Compute the absolute address of a given node.
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
@@ -72,6 +77,21 @@ static void gen_expr(Node *node) {
 
 static void gen_stmt(Node *node) {
   switch (node->kind) {
+  case ND_IF: {
+    int c = count();
+    gen_expr(node->cond);
+    printf("    brfalse _L_else_%d\n", c);
+    gen_stmt(node->then);
+    printf("    pop\n");
+    printf("    br _L_end_%d\n", c);
+    printf("_L_else_%d:\n", c);
+    if (node->els) {
+      gen_stmt(node->els);
+      printf("    pop\n");
+    }
+    printf("_L_end_%d:\n", c);
+    return;
+  }
   case ND_BLOCK:
     for (Node *n = node->body; n; n = n->next)
       gen_stmt(n);
