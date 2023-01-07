@@ -71,7 +71,12 @@ static void gen_expr(Node *node) {
 }
 
 static void gen_stmt(Node *node) {
-  if (node->kind == ND_EXPR_STMT) {
+  switch (node->kind) {
+  case ND_RETURN:
+    gen_expr(node->lhs);
+    printf("    br _L_return\n");
+    return;
+  case ND_EXPR_STMT:
     gen_expr(node->lhs);
     return;
   }
@@ -117,6 +122,7 @@ void codegen(Function *prog) {
       printf("    pop\n");
     }
   }
+  printf("_L_return:\n");
   printf("    ret\n");
   printf("  }\n");
   printf("}\n");
