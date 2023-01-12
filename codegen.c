@@ -49,6 +49,9 @@ static void gen_expr(Node *node) {
     printf("    stind.i4\n");
     printf("    ldind.i4\n");
     return;
+  case ND_FUNCALL:
+    printf("    call int32 [tmp2]chibicc::%s()\n", node->funcname);
+    return;
   }
 
   gen_expr(node->lhs);
