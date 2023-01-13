@@ -1,5 +1,9 @@
 #include "chibicc.h"
 
+static const char *to_typename(Type *ty) {
+  return "int32";
+}
+
 static void gen_expr(Node *node);
 
 static int count(void) {
@@ -50,7 +54,18 @@ static void gen_expr(Node *node) {
     printf("    ldind.i4\n");
     return;
   case ND_FUNCALL:
-    printf("    call int32 [tmp2]chibicc::%s()\n", node->funcname);
+    for (Node *arg = node->args; arg; arg = arg->next) {
+      gen_expr(arg);
+    }
+    printf("    call int32 [tmp2]C::_%s(", node->funcname);
+    for (Node *arg = node->args; arg; arg = arg->next) {
+      if (arg->next) {
+        printf("%s,", to_typename(arg->ty));
+      } else {
+        printf("%s", to_typename(arg->ty));
+      }
+    }
+    printf(")\n");
     return;
   }
 
@@ -159,12 +174,13 @@ void codegen(Function *prog) {
   printf(".assembly Test\n");
   printf("{\n");
   printf("}\n");
-  printf(".class public auto ansi abstract sealed beforefieldinit Test.Program\n");
+  printf(".class public auto ansi abstract sealed beforefieldinit C\n");
   printf("  extends [mscorlib]System.Object\n");
   printf("{\n");
   printf("  .method public hidebysig static int32 Main(string[] args) cil managed\n");
   printf("  {\n");
   printf("    .entrypoint\n");
+  printf("    .maxstack 10\n");
   if (prog->stack_size >= 1) {
     printf("    .locals init (\n");
     int i;
