@@ -195,7 +195,15 @@ void codegen(Function *prog) {
   printf("{\n");
 
   for (Function *fn = prog; fn; fn = fn->next) {
-    printf("  .method public hidebysig static int32 _%s() cil managed\n", fn->name);
+    printf("  .method public hidebysig static int32 _%s(", fn->name);
+    for (Obj *var = fn->params; var; var = var->next) {
+      if (var->next) {
+        printf("%s,", to_typename(var->ty));
+      } else {
+        printf("%s", to_typename(var->ty));
+      }
+    }
+    printf(") cil managed\n");
     printf("  {\n");
     if (strcmp(fn->name, "main") == 0)
       printf("    .entrypoint\n");
@@ -208,6 +216,14 @@ void codegen(Function *prog) {
       }
       printf("      [%d] int32\n", i);
       printf("    )\n");
+    }
+
+    // Save passed-by-register arguments to the stack
+    int i = 0;
+    for (Obj *var = fn->params; var; var = var->next) {
+      printf("    ldarg %d\n", i);
+      printf("    stloc %d\n", var->offset);
+      i++;
     }
 
     gen_stmt(fn->body);
