@@ -1,5 +1,8 @@
 #include "chibicc.h"
 
+static Function *current_prog;
+static Function *current_fn;
+
 static const char *to_typename(Type *ty) {
   return "int32";
 }
@@ -57,7 +60,15 @@ static void gen_expr(Node *node) {
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
     }
-    printf("    call int32 [tmp2]C::_%s(", node->funcname);
+    Function *fn;
+    for (fn = current_prog; fn; fn = fn->next) {
+      if (strcmp(fn->name, node->funcname) == 0)
+        break;
+    }
+    if (fn)
+      printf("    call int32 [Test]C::_%s(", node->funcname);
+    else
+      printf("    call int32 [tmp2]C::_%s(", node->funcname);
     for (Node *arg = node->args; arg; arg = arg->next) {
       if (arg->next) {
         printf("%s,", to_typename(arg->ty));
@@ -160,41 +171,51 @@ static void gen_stmt(Node *node) {
 
 // Assign offsets to local variables.
 static void assign_lvar_offsets(Function *prog) {
-  int offset = 0;
-  for (Obj *var = prog->locals; var; var = var->next) {
-    var->offset = offset;
-    offset++;
+  for (Function *fn = prog; fn; fn = fn->next) {
+    int offset = 0;
+    for (Obj *var = fn->locals; var; var = var->next) {
+      var->offset = offset;
+      offset++;
+    }
+    fn->stack_size = offset;
   }
-  prog->stack_size = offset;
 }
 
 void codegen(Function *prog) {
+  current_prog = prog;
+
   assign_lvar_offsets(prog);
 
   printf(".assembly Test\n");
   printf("{\n");
   printf("}\n");
+
   printf(".class public auto ansi abstract sealed beforefieldinit C\n");
   printf("  extends [mscorlib]System.Object\n");
   printf("{\n");
-  printf("  .method public hidebysig static int32 Main(string[] args) cil managed\n");
-  printf("  {\n");
-  printf("    .entrypoint\n");
-  printf("    .maxstack 10\n");
-  if (prog->stack_size >= 1) {
-    printf("    .locals init (\n");
-    int i;
-    for (i = 0; i < prog->stack_size; i++) {
-      printf("      [%d] int32,\n", i);
+
+  for (Function *fn = prog; fn; fn = fn->next) {
+    printf("  .method public hidebysig static int32 _%s() cil managed\n", fn->name);
+    printf("  {\n");
+    if (strcmp(fn->name, "main") == 0)
+      printf("    .entrypoint\n");
+    printf("    .maxstack 10\n");
+    if (fn->stack_size >= 1) {
+      printf("    .locals init (\n");
+      int i;
+      for (i = 0; i < fn->stack_size; i++) {
+        printf("      [%d] int32,\n", i);
+      }
+      printf("      [%d] int32\n", i);
+      printf("    )\n");
     }
-    printf("      [%d] int32\n", i);
-    printf("    )\n");
+
+    gen_stmt(fn->body);
+
+    printf("_L_return:\n");
+    printf("    ret\n");
+    printf("  }\n");
   }
 
-  gen_stmt(prog->body);
-
-  printf("_L_return:\n");
-  printf("    ret\n");
-  printf("  }\n");
   printf("}\n");
 }
