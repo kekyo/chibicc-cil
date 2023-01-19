@@ -19,7 +19,7 @@ static int count(void) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
-    printf("    ldloca %d\n", node->var->offset);
+    printf("  ldloca %d\n", node->var->offset);
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
@@ -32,51 +32,35 @@ static void gen_addr(Node *node) {
 static void gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NUM:
-    printf("    ldc.i4 %d\n", node->val);
+    printf("  ldc.i4 %d\n", node->val);
     return;
   case ND_NEG:
     gen_expr(node->lhs);
-    printf("    neg\n");
+    printf("  neg\n");
     return;
   case ND_VAR:
     gen_addr(node);
-    printf("    ldind.i4\n");
+    printf("  ldind.i4\n");
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
-    printf("    ldind.i4\n");
+    printf("  ldind.i4\n");
     return;
   case ND_ADDR:
     gen_addr(node->lhs);
     return;
   case ND_ASSIGN:
     gen_addr(node->lhs);
-    printf("    dup\n");
+    printf("  dup\n");
     gen_expr(node->rhs);
-    printf("    stind.i4\n");
-    printf("    ldind.i4\n");
+    printf("  stind.i4\n");
+    printf("  ldind.i4\n");
     return;
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
     }
-    Function *fn;
-    for (fn = current_prog; fn; fn = fn->next) {
-      if (strcmp(fn->name, node->funcname) == 0)
-        break;
-    }
-    if (fn)
-      printf("    call int32 [Test]C::_%s(", node->funcname);
-    else
-      printf("    call int32 [tmp2]C::_%s(", node->funcname);
-    for (Node *arg = node->args; arg; arg = arg->next) {
-      if (arg->next) {
-        printf("%s,", to_typename(arg->ty));
-      } else {
-        printf("%s", to_typename(arg->ty));
-      }
-    }
-    printf(")\n");
+    printf("  call %s\n", node->funcname);
     return;
   }
 
@@ -85,32 +69,32 @@ static void gen_expr(Node *node) {
 
   switch (node->kind) {
   case ND_ADD:
-    printf("    add\n");
+    printf("  add\n");
     return;
   case ND_SUB:
-    printf("    sub\n");
+    printf("  sub\n");
     return;
   case ND_MUL:
-    printf("    mul\n");
+    printf("  mul\n");
     return;
   case ND_DIV:
-    printf("    div\n");
+    printf("  div\n");
     return;
   case ND_EQ:
-    printf("    ceq\n");
+    printf("  ceq\n");
     return;
   case ND_NE:
-    printf("    ceq\n");
-    printf("    ldc.i4.0\n");
-    printf("    ceq\n");
+    printf("  ceq\n");
+    printf("  ldc.i4.0\n");
+    printf("  ceq\n");
     return;
   case ND_LT:
-    printf("    clt\n");
+    printf("  clt\n");
     return;
   case ND_LE:
-    printf("    cgt\n");
-    printf("    ldc.i4.0\n");
-    printf("    ceq\n");
+    printf("  cgt\n");
+    printf("  ldc.i4.0\n");
+    printf("  ceq\n");
     return;
   }
 
@@ -122,14 +106,14 @@ static void gen_stmt(Node *node) {
   case ND_IF: {
     int c = count();
     gen_expr(node->cond);
-    printf("    brfalse _L_else_%d\n", c);
+    printf("  brfalse _L_else_%d\n", c);
     gen_stmt(node->then);
-    printf("    pop\n");
-    printf("    br _L_end_%d\n", c);
+    printf("  pop\n");
+    printf("  br _L_end_%d\n", c);
     printf("_L_else_%d:\n", c);
     if (node->els) {
       gen_stmt(node->els);
-      printf("    pop\n");
+      printf("  pop\n");
     }
     printf("_L_end_%d:\n", c);
     return;
@@ -141,14 +125,14 @@ static void gen_stmt(Node *node) {
     printf("_L_begin_%d:\n", c);
     if (node->cond) {
       gen_expr(node->cond);
-      printf("    brfalse _L_end_%d\n", c);
+      printf("  brfalse _L_end_%d\n", c);
     }
     gen_stmt(node->then);
     if (node->inc) {
       gen_expr(node->inc);
-      printf("    pop\n");
+      printf("  pop\n");
     }
-    printf("    br _L_begin_%d\n", c);
+    printf("  br _L_begin_%d\n", c);
     printf("_L_end_%d:\n", c);
     return;
   }
@@ -158,11 +142,11 @@ static void gen_stmt(Node *node) {
     return;
   case ND_RETURN:
     gen_expr(node->lhs);
-    printf("    br _L_return\n");
+    printf("  br _L_return\n");
     return;
   case ND_EXPR_STMT:
     gen_expr(node->lhs);
-    printf("    pop\n");
+    printf("  pop\n");
     return;
   }
 
@@ -186,52 +170,28 @@ void codegen(Function *prog) {
 
   assign_lvar_offsets(prog);
 
-  printf(".assembly Test\n");
-  printf("{\n");
-  printf("}\n");
-
-  printf(".class public auto ansi abstract sealed beforefieldinit C\n");
-  printf("  extends [mscorlib]System.Object\n");
-  printf("{\n");
-
   for (Function *fn = prog; fn; fn = fn->next) {
-    printf("  .method public hidebysig static int32 _%s(", fn->name);
+    printf(".function int32 %s", fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
-      if (var->next) {
-        printf("%s,", to_typename(var->ty));
-      } else {
-        printf("%s", to_typename(var->ty));
-      }
+      printf(" %s:%s", var->name, to_typename(var->ty));
     }
-    printf(") cil managed\n");
-    printf("  {\n");
-    if (strcmp(fn->name, "main") == 0)
-      printf("    .entrypoint\n");
-    printf("    .maxstack 10\n");
-    if (fn->stack_size >= 1) {
-      printf("    .locals init (\n");
-      int i;
-      for (i = 0; i < fn->stack_size; i++) {
-        printf("      [%d] int32,\n", i);
-      }
-      printf("      [%d] int32\n", i);
-      printf("    )\n");
+    printf("\n");
+    int i;
+    for (i = 0; i < fn->stack_size; i++) {
+      printf("  .local int32\n");
     }
 
     // Save passed-by-register arguments to the stack
-    int i = 0;
+    i = 0;
     for (Obj *var = fn->params; var; var = var->next) {
-      printf("    ldarg %d\n", i);
-      printf("    stloc %d\n", var->offset);
+      printf("  ldarg %d\n", i);
+      printf("  stloc %d\n", var->offset);
       i++;
     }
 
     gen_stmt(fn->body);
 
     printf("_L_return:\n");
-    printf("    ret\n");
-    printf("  }\n");
+    printf("  ret\n");
   }
-
-  printf("}\n");
 }
