@@ -1,13 +1,13 @@
 #!/bin/bash
-ilasm -dll -output:tmp2.dll test2.s
-ilasm -dll -output:tmp3.dll test3.s
+chibias -c -o tmp2.dll test2.s
 
 assert() {
   expected="$1"
   input="$2"
 
+  rm -f tmp.exe
   ./chibicc "$input" > tmp.s || exit
-  ilasm -exe -output:tmp.exe tmp.s
+  chibias -r tmp2.dll -o tmp.exe tmp.s
   ./tmp.exe
   actual="$?"
 
