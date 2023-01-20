@@ -3,8 +3,42 @@
 static Function *current_prog;
 static Function *current_fn;
 
+static const char *to_typename0(Type *ty, int is_array_ptr) {
+  if (ty->base) {
+    const char *base_name = to_typename0(ty->base, is_array_ptr);
+    switch (ty->kind) {
+      case TY_ARRAY:
+        if (!is_array_ptr) {
+          int length1 = strlen(base_name) + 2;
+          char *name1 = calloc(length1 + 1, sizeof(char));
+          strcpy(name1, base_name);
+          strcat(name1, "[]");
+          return name1;
+        }
+        // Fall through
+      case TY_PTR:
+        int length2 = strlen(base_name) + 1;
+        char *name2 = calloc(length2 + 1, sizeof(char));
+        strcpy(name2, base_name);
+        strcat(name2, "*");
+        return name2;
+      default:
+        // BUG
+        return base_name;
+    }
+  }
+
+  switch (ty->kind) {
+    case TY_INT:
+      return "int32";
+    default:
+      // BUG
+      return "BUG";
+  }
+}
+
 static const char *to_typename(Type *ty) {
-  return "int32";
+  return to_typename0(ty, 0);
 }
 
 static void gen_expr(Node *node);
@@ -19,7 +53,10 @@ static int count(void) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
-    printf("  ldloca %d\n", node->var->offset);
+    if (node->ty->kind == TY_ARRAY) {
+      printf("  ldloc %d\n", node->var->offset);
+    } else
+      printf("  ldloca %d\n", node->var->offset);
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
@@ -27,6 +64,27 @@ static void gen_addr(Node *node) {
   }
 
   error_tok(node->tok, "not an lvalue");
+}
+
+// Load a value from where %rax is pointing to.
+static void load(Type *ty) {
+  if (ty->kind == TY_ARRAY) {
+    // If it is an array, do not attempt to load a value to the
+    // register because in general we can't load an entire array to a
+    // register. As a result, the result of an evaluation of an array
+    // becomes not the array itself but the address of the array.
+    // This is where "array is automatically converted to a pointer to
+    // the first element of the array in C" occurs.
+    return;
+  }
+
+  printf("  ldind.i4\n");
+}
+
+// Store %rax to an address that the stack top is pointing to.
+static void store(void) {
+  printf("  stind.i4\n");
+  printf("  ldind.i4\n");
 }
 
 static void gen_expr(Node *node) {
@@ -40,11 +98,11 @@ static void gen_expr(Node *node) {
     return;
   case ND_VAR:
     gen_addr(node);
-    printf("  ldind.i4\n");
+    load(node->ty);
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
-    printf("  ldind.i4\n");
+    load(node->ty);
     return;
   case ND_ADDR:
     gen_addr(node->lhs);
@@ -53,8 +111,7 @@ static void gen_expr(Node *node) {
     gen_addr(node->lhs);
     printf("  dup\n");
     gen_expr(node->rhs);
-    printf("  stind.i4\n");
-    printf("  ldind.i4\n");
+    store();
     return;
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
@@ -176,13 +233,23 @@ void codegen(Function *prog) {
       printf(" %s:%s", var->name, to_typename(var->ty));
     }
     printf("\n");
-    int i;
-    for (i = 0; i < fn->stack_size; i++) {
-      printf("  .local int32\n");
+    for (Obj *var = fn->locals; var; var = var->next) {
+      printf("  .local %s %s\n", to_typename0(var->ty, 1), var->name);
+    }
+
+    // Initialize local variable when type is array
+    for (Obj *var = fn->locals; var; var = var->next) {
+      if (var->ty->kind == TY_ARRAY) {
+        printf("  ldc.i4 %d\n", var->ty->array_len);
+        printf("  sizeof %s\n", to_typename0(var->ty->base, 1));
+        printf("  mul\n");
+        printf("  localloc\n");
+        printf("  stloc %d\n", var->offset);
+      }
     }
 
     // Save passed-by-register arguments to the stack
-    i = 0;
+    int i = 0;
     for (Obj *var = fn->params; var; var = var->next) {
       printf("  ldarg %d\n", i);
       printf("  stloc %d\n", var->offset);
