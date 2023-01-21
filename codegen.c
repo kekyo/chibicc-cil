@@ -5,17 +5,28 @@ static Function *current_fn;
 
 static const char *to_typename0(Type *ty, int is_array_ptr) {
   if (ty->base) {
+    if (ty->kind == TY_ARRAY && is_array_ptr) {
+      Type *base_ty = ty->base;
+      while (base_ty) {
+        if (!base_ty->base)
+          break;
+        base_ty = base_ty->base;
+      }
+      const char *base0_name = to_typename0(base_ty, is_array_ptr);
+      int length2 = strlen(base0_name) + 1;
+      char *name2 = calloc(length2 + 1, sizeof(char));
+      strcpy(name2, base0_name);
+      strcat(name2, "*");
+      return name2;
+    }
     const char *base_name = to_typename0(ty->base, is_array_ptr);
     switch (ty->kind) {
       case TY_ARRAY:
-        if (!is_array_ptr) {
-          int length1 = strlen(base_name) + 2;
-          char *name1 = calloc(length1 + 1, sizeof(char));
-          strcpy(name1, base_name);
-          strcat(name1, "[]");
-          return name1;
-        }
-        // Fall through
+        int length1 = strlen(base_name) + 2;
+        char *name1 = calloc(length1 + 1, sizeof(char));
+        strcpy(name1, base_name);
+        strcat(name1, "[]");
+        return name1;
       case TY_PTR:
         int length2 = strlen(base_name) + 1;
         char *name2 = calloc(length2 + 1, sizeof(char));
