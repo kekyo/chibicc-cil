@@ -165,13 +165,10 @@ static void gen_stmt(Node *node) {
     gen_expr(node->cond);
     printf("  brfalse _L_else_%d\n", c);
     gen_stmt(node->then);
-    printf("  pop\n");
     printf("  br _L_end_%d\n", c);
     printf("_L_else_%d:\n", c);
-    if (node->els) {
+    if (node->els)
       gen_stmt(node->els);
-      printf("  pop\n");
-    }
     printf("_L_end_%d:\n", c);
     return;
   }
