@@ -63,10 +63,19 @@ static int count(void) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
-    if (node->ty->kind == TY_ARRAY) {
-      printf("  ldloc %d\n", node->var->offset);
-    } else
-      printf("  ldloca %d\n", node->var->offset);
+    if (node->var->is_local) {
+      // Local variable
+      if (node->ty->kind == TY_ARRAY)
+        printf("  ldloc %d\n", node->var->offset);
+      else
+        printf("  ldloca %d\n", node->var->offset);
+    } else {
+      // Global variable
+      if (node->ty->kind == TY_ARRAY)
+        printf("  ldsfld %s\n", node->var->name);
+      else
+        printf("  ldsflda %s\n", node->var->name);
+    }
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
@@ -232,7 +241,39 @@ static void assign_lvar_offsets(Obj *prog) {
   }
 }
 
-void codegen(Obj *prog) {
+static void emit_data(Obj *prog) {
+  for (Obj *var = prog; var; var = var->next) {
+    if (var->is_function)
+      continue;
+
+    printf(".global %s %s\n", to_typename0(var->ty, 1), var->name);
+
+    if (var->ty->kind == TY_ARRAY) {
+      const char *element_type_name = to_typename0(var->ty->base, 1);
+      int total_length = var->ty->array_len;
+      Type *current_ty = var->ty->base;
+      while (current_ty->kind == TY_ARRAY) {
+        total_length *= current_ty->array_len;
+        current_ty = current_ty->base;
+      }
+
+      printf(".initializer\n");
+      printf("  ldc.i4 %d\n", total_length);
+      printf("  newarr %s\n", element_type_name);
+      printf("  dup\n");
+      printf("  ldc.i4.3\n");  // Pinned
+      printf("  call System.Runtime.InteropServices.GCHandle.Alloc object System.Runtime.InteropServices.GCHandleType\n");
+      printf("  pop\n");
+      printf("  ldc.i4.0\n");
+      printf("  conv.i\n");
+      printf("  ldelema %s\n", element_type_name);
+      printf("  stsfld %s\n", var->name);
+      printf("  ret\n");
+    }
+  }
+}
+
+static void emit_text(Obj *prog) {
   assign_lvar_offsets(prog);
 
   for (Obj *fn = prog; fn; fn = fn->next) {
@@ -272,4 +313,10 @@ void codegen(Obj *prog) {
     printf("_L_return:\n");
     printf("  ret\n");
   }
+}
+
+void codegen(Obj *prog) {
+  assign_lvar_offsets(prog);
+  emit_data(prog);
+  emit_text(prog);
 }
