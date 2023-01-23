@@ -41,6 +41,8 @@ static const char *to_typename0(Type *ty, int is_array_ptr) {
   switch (ty->kind) {
     case TY_INT:
       return "int32";
+    case TY_CHAR:
+      return "int8";
     default:
       // BUG
       return "BUG";
@@ -97,13 +99,21 @@ static void load(Type *ty) {
     return;
   }
 
-  printf("  ldind.i4\n");
+  if (ty->size == 1)
+    printf("  ldind.i1\n");
+  else
+    printf("  ldind.i4\n");
 }
 
 // Store %rax to an address that the stack top is pointing to.
-static void store(void) {
-  printf("  stind.i4\n");
-  printf("  ldind.i4\n");
+static void store(Type *ty) {
+  if (ty->size == 1) {
+    printf("  stind.i1\n");
+    printf("  ldind.i1\n");
+  } else {
+    printf("  stind.i4\n");
+    printf("  ldind.i4\n");
+  }
 }
 
 static void gen_expr(Node *node) {
@@ -130,7 +140,7 @@ static void gen_expr(Node *node) {
     gen_addr(node->lhs);
     printf("  dup\n");
     gen_expr(node->rhs);
-    store();
+    store(node->ty);
     return;
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
