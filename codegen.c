@@ -271,6 +271,13 @@ static void emit_data(Obj *prog) {
       printf("  ldc.i4 %d\n", total_length);
       printf("  newarr %s\n", element_type_name);
       printf("  dup\n");
+
+      if (var->init_data) {
+        printf("  dup\n");
+        printf("  ldtoken <initdata>_%s\n", var->name);
+        printf("  call System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray System.Array System.RuntimeFieldHandle\n");
+      }
+
       printf("  ldc.i4.3\n");  // Pinned
       printf("  call System.Runtime.InteropServices.GCHandle.Alloc object System.Runtime.InteropServices.GCHandleType\n");
       printf("  pop\n");
@@ -279,6 +286,13 @@ static void emit_data(Obj *prog) {
       printf("  ldelema %s\n", element_type_name);
       printf("  stsfld %s\n", var->name);
       printf("  ret\n");
+
+      if (var->init_data) {
+        printf(".constant <initdata>_%s", var->name);
+        for (int i = 0; i < var->ty->size; i++)
+          printf(" 0x%x", var->init_data[i]);
+        printf("\n");
+      }
     }
   }
 }
