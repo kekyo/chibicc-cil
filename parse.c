@@ -108,9 +108,7 @@ static Obj *new_gvar(char *name, Type *ty) {
 
 static char *new_unique_name(void) {
   static int id = 0;
-  char *buf = calloc(1, 20);
-  sprintf(buf, "_L__%d", id++);
-  return buf;
+  return format("_L__%d", id++);
 }
 
 static Obj *new_anon_gvar(Type *ty) {
