@@ -290,7 +290,7 @@ static void emit_data(Obj *prog) {
       if (var->init_data) {
         printf(".constant <initdata>_%s", var->name);
         for (int i = 0; i < var->ty->size; i++)
-          printf(" 0x%x", var->init_data[i]);
+          printf(" 0x%hhx", var->init_data[i]);
         printf("\n");
       }
     }
