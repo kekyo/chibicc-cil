@@ -54,6 +54,7 @@ static const char *to_typename(Type *ty) {
 }
 
 static void gen_expr(Node *node);
+static void gen_stmt(Node *node);
 
 static int count(void) {
   static int i = 1;
@@ -141,6 +142,13 @@ static void gen_expr(Node *node) {
     printf("  dup\n");
     gen_expr(node->rhs);
     store(node->ty);
+    return;
+  case ND_STMT_EXPR:
+    for (Node *n = node->body; n; n = n->next)
+      if (n->next)
+        gen_stmt(n);
+      else
+        gen_expr(n->lhs);
     return;
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
