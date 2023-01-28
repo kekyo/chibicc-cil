@@ -56,6 +56,21 @@ static const char *to_typename(Type *ty) {
 static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
 
+static void println(char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vprintf(fmt, ap);
+  va_end(ap);
+  printf("\n");
+}
+
+static void print(char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vprintf(fmt, ap);
+  va_end(ap);
+}
+
 static int count(void) {
   static int i = 1;
   return i++;
@@ -69,15 +84,15 @@ static void gen_addr(Node *node) {
     if (node->var->is_local) {
       // Local variable
       if (node->ty->kind == TY_ARRAY)
-        printf("  ldloc %d\n", node->var->offset);
+        println("  ldloc %d", node->var->offset);
       else
-        printf("  ldloca %d\n", node->var->offset);
+        println("  ldloca %d", node->var->offset);
     } else {
       // Global variable
       if (node->ty->kind == TY_ARRAY)
-        printf("  ldsfld %s\n", node->var->name);
+        println("  ldsfld %s", node->var->name);
       else
-        printf("  ldsflda %s\n", node->var->name);
+        println("  ldsflda %s", node->var->name);
     }
     return;
   case ND_DEREF:
@@ -101,30 +116,30 @@ static void load(Type *ty) {
   }
 
   if (ty->size == 1)
-    printf("  ldind.i1\n");
+    println("  ldind.i1");
   else
-    printf("  ldind.i4\n");
+    println("  ldind.i4");
 }
 
 // Store %rax to an address that the stack top is pointing to.
 static void store(Type *ty) {
   if (ty->size == 1) {
-    printf("  stind.i1\n");
-    printf("  ldind.i1\n");
+    println("  stind.i1");
+    println("  ldind.i1");
   } else {
-    printf("  stind.i4\n");
-    printf("  ldind.i4\n");
+    println("  stind.i4");
+    println("  ldind.i4");
   }
 }
 
 static void gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NUM:
-    printf("  ldc.i4 %d\n", node->val);
+    println("  ldc.i4 %d", node->val);
     return;
   case ND_NEG:
     gen_expr(node->lhs);
-    printf("  neg\n");
+    println("  neg");
     return;
   case ND_VAR:
     gen_addr(node);
@@ -139,7 +154,7 @@ static void gen_expr(Node *node) {
     return;
   case ND_ASSIGN:
     gen_addr(node->lhs);
-    printf("  dup\n");
+    println("  dup");
     gen_expr(node->rhs);
     store(node->ty);
     return;
@@ -154,7 +169,7 @@ static void gen_expr(Node *node) {
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
     }
-    printf("  call %s\n", node->funcname);
+    println("  call %s", node->funcname);
     return;
   }
 
@@ -163,32 +178,32 @@ static void gen_expr(Node *node) {
 
   switch (node->kind) {
   case ND_ADD:
-    printf("  add\n");
+    println("  add");
     return;
   case ND_SUB:
-    printf("  sub\n");
+    println("  sub");
     return;
   case ND_MUL:
-    printf("  mul\n");
+    println("  mul");
     return;
   case ND_DIV:
-    printf("  div\n");
+    println("  div");
     return;
   case ND_EQ:
-    printf("  ceq\n");
+    println("  ceq");
     return;
   case ND_NE:
-    printf("  ceq\n");
-    printf("  ldc.i4.0\n");
-    printf("  ceq\n");
+    println("  ceq");
+    println("  ldc.i4.0");
+    println("  ceq");
     return;
   case ND_LT:
-    printf("  clt\n");
+    println("  clt");
     return;
   case ND_LE:
-    printf("  cgt\n");
-    printf("  ldc.i4.0\n");
-    printf("  ceq\n");
+    println("  cgt");
+    println("  ldc.i4.0");
+    println("  ceq");
     return;
   }
 
@@ -200,31 +215,31 @@ static void gen_stmt(Node *node) {
   case ND_IF: {
     int c = count();
     gen_expr(node->cond);
-    printf("  brfalse _L_else_%d\n", c);
+    println("  brfalse _L_else_%d", c);
     gen_stmt(node->then);
-    printf("  br _L_end_%d\n", c);
-    printf("_L_else_%d:\n", c);
+    println("  br _L_end_%d", c);
+    println("_L_else_%d:", c);
     if (node->els)
       gen_stmt(node->els);
-    printf("_L_end_%d:\n", c);
+    println("_L_end_%d:", c);
     return;
   }
   case ND_FOR: {
     int c = count();
     if (node->init)
       gen_stmt(node->init);
-    printf("_L_begin_%d:\n", c);
+    println("_L_begin_%d:", c);
     if (node->cond) {
       gen_expr(node->cond);
-      printf("  brfalse _L_end_%d\n", c);
+      println("  brfalse _L_end_%d", c);
     }
     gen_stmt(node->then);
     if (node->inc) {
       gen_expr(node->inc);
-      printf("  pop\n");
+      println("  pop");
     }
-    printf("  br _L_begin_%d\n", c);
-    printf("_L_end_%d:\n", c);
+    println("  br _L_begin_%d", c);
+    println("_L_end_%d:", c);
     return;
   }
   case ND_BLOCK:
@@ -233,11 +248,11 @@ static void gen_stmt(Node *node) {
     return;
   case ND_RETURN:
     gen_expr(node->lhs);
-    printf("  br _L_return\n");
+    println("  br _L_return");
     return;
   case ND_EXPR_STMT:
     gen_expr(node->lhs);
-    printf("  pop\n");
+    println("  pop");
     return;
   }
 
@@ -264,7 +279,7 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    printf(".global %s %s\n", to_typename0(var->ty, 1), var->name);
+    println(".global %s %s", to_typename0(var->ty, 1), var->name);
 
     if (var->ty->kind == TY_ARRAY) {
       const char *element_type_name = to_typename0(var->ty->base, 1);
@@ -275,31 +290,31 @@ static void emit_data(Obj *prog) {
         current_ty = current_ty->base;
       }
 
-      printf(".initializer\n");
-      printf("  ldc.i4 %d\n", total_length);
-      printf("  newarr %s\n", element_type_name);
-      printf("  dup\n");
+      println(".initializer");
+      println("  ldc.i4 %d", total_length);
+      println("  newarr %s", element_type_name);
+      println("  dup");
 
       if (var->init_data) {
-        printf("  dup\n");
-        printf("  ldtoken <initdata>_%s\n", var->name);
-        printf("  call System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray System.Array System.RuntimeFieldHandle\n");
+        println("  dup");
+        println("  ldtoken <initdata>_%s", var->name);
+        println("  call System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray System.Array System.RuntimeFieldHandle");
       }
 
-      printf("  ldc.i4.3\n");  // Pinned
-      printf("  call System.Runtime.InteropServices.GCHandle.Alloc object System.Runtime.InteropServices.GCHandleType\n");
-      printf("  pop\n");
-      printf("  ldc.i4.0\n");
-      printf("  conv.i\n");
-      printf("  ldelema %s\n", element_type_name);
-      printf("  stsfld %s\n", var->name);
-      printf("  ret\n");
+      println("  ldc.i4.3");  // Pinned
+      println("  call System.Runtime.InteropServices.GCHandle.Alloc object System.Runtime.InteropServices.GCHandleType");
+      println("  pop");
+      println("  ldc.i4.0");
+      println("  conv.i");
+      println("  ldelema %s", element_type_name);
+      println("  stsfld %s", var->name);
+      println("  ret");
 
       if (var->init_data) {
-        printf(".constant <initdata>_%s", var->name);
+        print(".constant <initdata>_%s", var->name);
         for (int i = 0; i < var->ty->size; i++)
-          printf(" 0x%hhx", var->init_data[i]);
-        printf("\n");
+          print(" 0x%hhx", var->init_data[i]);
+        println("");
       }
     }
   }
@@ -312,34 +327,34 @@ static void emit_text(Obj *prog) {
     if (!fn->is_function)
       continue;
 
-    printf(".function int32 %s", fn->name);
+    print(".function int32 %s", fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
-      printf(" %s:%s", var->name, to_typename(var->ty));
+      print(" %s:%s", var->name, to_typename(var->ty));
     }
-    printf("\n");
+    println("");
     current_fn = fn;
 
     // Prologue
     for (Obj *var = fn->locals; var; var = var->next) {
-      printf("  .local %s %s\n", to_typename0(var->ty, 1), var->name);
+      println("  .local %s %s", to_typename0(var->ty, 1), var->name);
     }
 
     // Initialize local variable when type is array
     for (Obj *var = fn->locals; var; var = var->next) {
       if (var->ty->kind == TY_ARRAY) {
-        printf("  ldc.i4 %d\n", var->ty->array_len);
-        printf("  sizeof %s\n", to_typename0(var->ty->base, 1));
-        printf("  mul\n");
-        printf("  localloc\n");
-        printf("  stloc %d\n", var->offset);
+        println("  ldc.i4 %d", var->ty->array_len);
+        println("  sizeof %s", to_typename0(var->ty->base, 1));
+        println("  mul");
+        println("  localloc");
+        println("  stloc %d", var->offset);
       }
     }
 
     // Save passed-by-register arguments to the stack
     int i = 0;
     for (Obj *var = fn->params; var; var = var->next) {
-      printf("  ldarg %d\n", i);
-      printf("  stloc %d\n", var->offset);
+      println("  ldarg %d", i);
+      println("  stloc %d", var->offset);
       i++;
     }
 
@@ -347,8 +362,8 @@ static void emit_text(Obj *prog) {
     gen_stmt(fn->body);
 
     // Epilogue
-    printf("_L_return:\n");
-    printf("  ret\n");
+    println("_L_return:");
+    println("  ret");
   }
 }
 
