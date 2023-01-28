@@ -79,6 +79,14 @@ static bool is_ident2(char c) {
   return is_ident1(c) || ('0' <= c && c <= '9');
 }
 
+static int from_hex(char c) {
+  if ('0' <= c && c <= '9')
+    return c - '0';
+  if ('a' <= c && c <= 'f')
+    return c - 'a' + 10;
+  return c - 'A' + 10;
+}
+
 // Read a punctuator token from p and returns its length.
 static int read_punct(char *p) {
   if (startswith(p, "==") || startswith(p, "!=") ||
@@ -86,14 +94,6 @@ static int read_punct(char *p) {
     return 2;
 
   return ispunct(*p) ? 1 : 0;
-}
-
-static int from_hex(char c) {
-  if ('0' <= c && c <= '9')
-    return c - '0';
-  if ('a' <= c && c <= 'f')
-    return c - 'a' + 10;
-  return c - 'A' + 10;
 }
 
 static bool is_keyword(Token *tok) {

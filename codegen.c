@@ -296,6 +296,9 @@ static void emit_text(Obj *prog) {
       printf(" %s:%s", var->name, to_typename(var->ty));
     }
     printf("\n");
+    current_fn = fn;
+
+    // Prologue
     for (Obj *var = fn->locals; var; var = var->next) {
       printf("  .local %s %s\n", to_typename(var->ty), var->name);
     }
@@ -308,8 +311,10 @@ static void emit_text(Obj *prog) {
       i++;
     }
 
+    // Emit code
     gen_stmt(fn->body);
 
+    // Epilogue
     printf("_L_return:\n");
     printf("  ret\n");
   }
