@@ -6,7 +6,7 @@ assert() {
   input="$2"
 
   rm -f tmp.exe
-  echo "$input" | ./chibicc - > tmp.s || exit
+  echo "$input" | ./chibicc -o tmp.s - || exit
   chibias -r tmp2.dll -o tmp.exe tmp.s
   ./tmp.exe
   actual="$?"
