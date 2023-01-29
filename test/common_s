@@ -1,0 +1,39 @@
+; void assert(int expected, int actual, char *code)
+.function int32 assert expected:int32 actual:int32 code:int8*
+    ; if (expected == actual)
+    ldarg.0
+    ldarg.1
+    ceq
+    brfalse L_NOTEQ
+    ; printf("%s => %d\n", code, actual);
+    ldstr "{0} => {1}"
+    ldarg.2
+    call System.Runtime.InteropServices.Marshal.PtrToStringAnsi intptr
+    ldarg.1
+    box int32
+    call System.Console.WriteLine string object object
+    br L_EXIT
+L_NOTEQ:
+    ; printf("%s => %d expected but got %d\n", code, expected, actual);
+    ldstr "{0} => {1} expected but got {2}"
+    ldarg.2
+    call System.Runtime.InteropServices.Marshal.PtrToStringAnsi intptr
+    ldarg.0
+    box int32
+    ldarg.1
+    box int32
+    call System.Console.WriteLine string object object object
+    ; exit(1);
+    ldc.i4.1
+    call System.Environment.Exit int32
+L_EXIT:
+    ldc.i4.0   ; HACK: Currently void type is not supported.
+    ret
+
+; void printf(char *arg)
+.function int32 printf arg:int8*
+    ldarg.0
+    call System.Runtime.InteropServices.Marshal.PtrToStringAnsi intptr
+    call System.Console.Write string
+    ldc.i4.0   ; HACK: Currently void type is not supported.
+    ret
