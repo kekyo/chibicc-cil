@@ -116,6 +116,11 @@ static void load(Type *ty) {
     return;
   }
 
+  if (ty->kind == TY_PTR) {
+    println("  ldind.i");
+    return;
+  }
+
   if (ty->size == 1)
     println("  ldind.i1");
   else
@@ -124,6 +129,13 @@ static void load(Type *ty) {
 
 // Store %rax to an address that the stack top is pointing to.
 static void store(Type *ty) {
+  if (ty->kind == TY_PTR) {
+    println("  conv.u");
+    println("  stind.i");
+    println("  ldind.i");
+    return;
+  }
+
   if (ty->size == 1) {
     println("  stind.i1");
     println("  ldind.i1");
