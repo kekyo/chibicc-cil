@@ -43,6 +43,8 @@ struct Token {
   char *str;      // String literal contents including terminating '\0'
 
   int line_no;    // Line number
+  int start_column_no;  // Start column number
+  int end_column_no;    // End column number
 };
 
 void error(char *fmt, ...);

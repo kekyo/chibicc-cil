@@ -134,6 +134,13 @@ static void store(Type *ty) {
 }
 
 static void gen_expr(Node *node) {
+  if (node->tok)
+    println("  .location 1 %d %d %d %d",
+      node->tok->line_no - 1,
+      node->tok->start_column_no - 1,
+      node->tok->line_no - 1,
+      node->tok->end_column_no - 1);
+
   switch (node->kind) {
   case ND_NUM:
     println("  ldc.i4 %d", node->val);
@@ -222,6 +229,13 @@ static void gen_expr(Node *node) {
 }
 
 static void gen_stmt(Node *node) {
+  if (node->tok)
+    println("  .location 1 %d %d %d %d",
+      node->tok->line_no - 1,
+      node->tok->start_column_no - 1,
+      node->tok->line_no - 1,
+      node->tok->end_column_no - 1);
+
   switch (node->kind) {
   case ND_IF: {
     int c = count();
