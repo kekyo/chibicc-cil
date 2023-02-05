@@ -143,12 +143,6 @@ static void store(Type *ty) {
 }
 
 static void gen_expr(Node *node) {
-  println("  .location 1 %d %d %d %d",
-    node->tok->line_no - 1,
-    node->tok->column_no - 1,
-    node->tok->line_no - 1,
-    node->tok->column_no + node->tok->len - 1);
-
   switch (node->kind) {
   case ND_NUM:
     println("  ldc.i4 %d", node->val);
