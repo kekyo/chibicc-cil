@@ -3,6 +3,29 @@
 static FILE *output_file;
 static Obj *current_fn;
 
+static void gen_expr(Node *node);
+static void gen_stmt(Node *node);
+
+static void println(char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(output_file, fmt, ap);
+  va_end(ap);
+  fprintf(output_file, "\n");
+}
+
+static void print(char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(output_file, fmt, ap);
+  va_end(ap);
+}
+
+static int count(void) {
+  static int i = 1;
+  return i++;
+}
+
 static const char *to_typename0(Type *ty, int is_array_ptr) {
   if (ty->base) {
     if (ty->kind == TY_ARRAY && is_array_ptr) {
@@ -52,29 +75,6 @@ static const char *to_typename0(Type *ty, int is_array_ptr) {
 
 static const char *to_typename(Type *ty) {
   return to_typename0(ty, 0);
-}
-
-static void gen_expr(Node *node);
-static void gen_stmt(Node *node);
-
-static void println(char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(output_file, fmt, ap);
-  va_end(ap);
-  fprintf(output_file, "\n");
-}
-
-static void print(char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(output_file, fmt, ap);
-  va_end(ap);
-}
-
-static int count(void) {
-  static int i = 1;
-  return i++;
 }
 
 // Compute the absolute address of a given node.
