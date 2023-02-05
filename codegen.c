@@ -26,29 +26,14 @@ static int count(void) {
   return i++;
 }
 
-static const char *to_typename0(Type *ty, int is_array_ptr) {
+static const char *to_typename(Type *ty) {
   if (ty->base) {
-    if (ty->kind == TY_ARRAY && is_array_ptr) {
-      Type *base_ty = ty->base;
-      while (base_ty) {
-        if (!base_ty->base)
-          break;
-        base_ty = base_ty->base;
-      }
-      const char *base0_name = to_typename0(base_ty, is_array_ptr);
-      int length2 = strlen(base0_name) + 1;
-      char *name2 = calloc(length2 + 1, sizeof(char));
-      strcpy(name2, base0_name);
-      strcat(name2, "*");
-      return name2;
-    }
-    const char *base_name = to_typename0(ty->base, is_array_ptr);
+    const char *base_name = to_typename(ty->base);
     switch (ty->kind) {
       case TY_ARRAY:
-        int length1 = strlen(base_name) + 2;
+        int length1 = strlen(base_name) + 13;
         char *name1 = calloc(length1 + 1, sizeof(char));
-        strcpy(name1, base_name);
-        strcat(name1, "[]");
+        sprintf(name1, "%s[%d]", base_name, ty->array_len);
         return name1;
       case TY_PTR:
         int length2 = strlen(base_name) + 1;
@@ -67,14 +52,14 @@ static const char *to_typename0(Type *ty, int is_array_ptr) {
       return "int32";
     case TY_CHAR:
       return "int8";
+    case TY_STRUCT:
+      char *name3 = calloc(22, sizeof(char));
+      sprintf(name3, "_S__%p", ty);
+      return name3;
     default:
       // BUG
       return "BUG";
   }
-}
-
-static const char *to_typename(Type *ty) {
-  return to_typename0(ty, 0);
 }
 
 // Compute the absolute address of a given node.
@@ -82,19 +67,12 @@ static const char *to_typename(Type *ty) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
-    if (node->var->is_local) {
+    if (node->var->is_local)
       // Local variable
-      if (node->ty->kind == TY_ARRAY)
-        println("  ldloc %d", node->var->offset);
-      else
-        println("  ldloca %d", node->var->offset);
-    } else {
+      println("  ldloca %d", node->var->offset);
+    else
       // Global variable
-      if (node->ty->kind == TY_ARRAY)
-        println("  ldsfld %s", node->var->name);
-      else
-        println("  ldsflda %s", node->var->name);
-    }
+      println("  ldsflda %s", node->var->name);
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
@@ -103,6 +81,11 @@ static void gen_addr(Node *node) {
     gen_expr(node->lhs);
     println("  pop");
     gen_addr(node->rhs);
+    return;
+  case ND_MEMBER:
+    gen_addr(node->lhs);
+    println("  ldc.i4 %d", node->member->offset);
+    println("  add");
     return;
   }
 
@@ -166,6 +149,7 @@ static void gen_expr(Node *node) {
     println("  neg");
     return;
   case ND_VAR:
+  case ND_MEMBER:
     gen_addr(node);
     load(node->ty);
     return;
@@ -294,6 +278,37 @@ static void gen_stmt(Node *node) {
   error_tok(node->tok, "invalid statement");
 }
 
+static void emit_struct_type(Type *ty) {
+  switch (ty->kind) {
+    case TY_PTR:
+    case TY_ARRAY:
+      emit_struct_type(ty->base);
+      break;
+    case TY_STRUCT:
+      println(".structure %s", to_typename(ty));
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        println("  %s %s", to_typename(mem->ty), get_string(mem->name));
+      }
+      // Emit member type recursively.
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        emit_struct_type(mem->ty);
+      }
+      break;
+  }
+}
+
+static void emit_struct(Obj *prog) {
+  for (Obj *fn = prog; fn; fn = fn->next) {
+    if (!fn->is_function)
+      continue;
+
+    // Included parameter types.
+    for (Obj *var = fn->locals; var; var = var->next) {
+      emit_struct_type(var->ty);
+    }
+  }
+}
+
 // Assign offsets to local variables.
 static void assign_lvar_offsets(Obj *prog) {
   for (Obj *fn = prog; fn; fn = fn->next) {
@@ -314,50 +329,20 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    println(".global %s %s", to_typename0(var->ty, 1), var->name);
+    print(".global %s %s", to_typename(var->ty), var->name);
 
-    if (var->ty->kind == TY_ARRAY) {
-      const char *element_type_name = to_typename0(var->ty->base, 1);
-      int total_length = var->ty->array_len;
-      Type *current_ty = var->ty->base;
-      while (current_ty->kind == TY_ARRAY) {
-        total_length *= current_ty->array_len;
-        current_ty = current_ty->base;
-      }
-
-      println(".initializer");
-      println("  ldc.i4 %d", total_length);
-      println("  newarr %s", element_type_name);
-      println("  dup");
-
-      if (var->init_data) {
-        println("  dup");
-        println("  ldtoken <initdata>_%s", var->name);
-        println("  call System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray System.Array System.RuntimeFieldHandle");
-      }
-
-      println("  ldc.i4.3");  // Pinned
-      println("  call System.Runtime.InteropServices.GCHandle.Alloc object System.Runtime.InteropServices.GCHandleType");
-      println("  pop");
-      println("  ldc.i4.0");
-      println("  conv.i");
-      println("  ldelema %s", element_type_name);
-      println("  stsfld %s", var->name);
-      println("  ret");
-
-      if (var->init_data) {
-        print(".constant <initdata>_%s", var->name);
+    if (var->init_data) {
+      if (var->ty->kind == TY_ARRAY) {
         for (int i = 0; i < var->ty->size; i++)
           print(" 0x%hhx", var->init_data[i]);
-        println("");
       }
     }
+
+    println("");
   }
 }
 
 static void emit_text(Obj *prog) {
-  assign_lvar_offsets(prog);
-
   for (Obj *fn = prog; fn; fn = fn->next) {
     if (!fn->is_function)
       continue;
@@ -371,18 +356,7 @@ static void emit_text(Obj *prog) {
 
     // Prologue
     for (Obj *var = fn->locals; var; var = var->next) {
-      println("  .local %s %s", to_typename0(var->ty, 1), var->name);
-    }
-
-    // Initialize local variable when type is array
-    for (Obj *var = fn->locals; var; var = var->next) {
-      if (var->ty->kind == TY_ARRAY) {
-        println("  ldc.i4 %d", var->ty->array_len);
-        println("  sizeof %s", to_typename0(var->ty->base, 1));
-        println("  mul");
-        println("  localloc");
-        println("  stloc %d", var->offset);
-      }
+      println("  .local %s %s", to_typename(var->ty), var->name);
     }
 
     // Save passed-by-register arguments to the stack
@@ -406,6 +380,7 @@ void codegen(Obj *prog, FILE *out) {
   output_file = out;
   
   assign_lvar_offsets(prog);
+  emit_struct(prog);
   emit_data(prog);
   emit_text(prog);
 }

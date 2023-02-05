@@ -60,6 +60,12 @@ void error_tok(Token *tok, char *fmt, ...) {
   verror_at(tok->line_no, tok->loc, fmt, ap);
 }
 
+char *get_string(Token *tok) {
+  char *str = calloc(tok->len + 1, sizeof(char));
+  strncpy(str, tok->loc, tok->len);
+  return str;
+}
+
 // Consumes the current token if it matches `op`.
 bool equal(Token *tok, char *op) {
   return memcmp(tok->loc, op, tok->len) == 0 && op[tok->len] == '\0';
@@ -124,6 +130,7 @@ static int read_punct(char *p) {
 static bool is_keyword(Token *tok) {
   static char *kw[] = {
     "return", "if", "else", "for", "while", "int", "sizeof", "char",
+    "struct",
   };
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
