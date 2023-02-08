@@ -53,6 +53,7 @@ static const char *to_typename(Type *ty) {
     case TY_CHAR:
       return "int8";
     case TY_STRUCT:
+    case TY_UNION:
       if (ty->tag) {
         char *tag_name = get_string(ty->tag);
         char *name3 = calloc(strlen(tag_name) + 1 + 18 + 1, sizeof(char));
@@ -292,6 +293,7 @@ static void emit_struct_type(Type *ty) {
       emit_struct_type(ty->base);
       break;
     case TY_STRUCT:
+    case TY_UNION:
       println(".structure %s explicit", to_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
         println("  %s %s %d", to_typename(mem->ty), get_string(mem->name), mem->offset);
