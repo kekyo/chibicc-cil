@@ -53,9 +53,16 @@ static const char *to_typename(Type *ty) {
     case TY_CHAR:
       return "int8";
     case TY_STRUCT:
-      char *name3 = calloc(22, sizeof(char));
-      sprintf(name3, "_S__%p", ty);
-      return name3;
+      if (ty->tag) {
+        char *tag_name = get_string(ty->tag);
+        char *name3 = calloc(strlen(tag_name) + 1 + 18 + 1, sizeof(char));
+        sprintf(name3, "%s_%p", tag_name, ty);
+        return name3;
+      } else {
+        char *name4 = calloc(4 + 18 + 1, sizeof(char));
+        sprintf(name4, "tag_%p", ty);
+        return name4;
+      }
     default:
       // BUG
       return "BUG";
