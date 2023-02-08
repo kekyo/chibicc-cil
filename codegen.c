@@ -450,7 +450,7 @@ static void emit_text(Obj *prog) {
     if (!fn->is_function || !fn->is_definition)
       continue;
 
-    print(".function int32 %s", fn->name);
+    print(".function %s %s", to_cil_typename(fn->ty->return_ty), fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
       print(" %s:%s", var->name, to_cil_typename(var->ty));
     }
