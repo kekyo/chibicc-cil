@@ -108,6 +108,11 @@ static void gen_addr(Node *node) {
 
 // Load a value from where %rax is pointing to.
 static void load(Type *ty) {
+  if (ty->kind == TY_STRUCT || ty->kind == TY_UNION) {
+    println("  ldobj %s", to_typename(ty));
+    return;
+  }
+
   if (ty->kind == TY_ARRAY) {
     // If it is an array, do not attempt to load a value to the
     // register because in general we can't load an entire array to a
@@ -131,6 +136,12 @@ static void load(Type *ty) {
 
 // Store %rax to an address that the stack top is pointing to.
 static void store(Type *ty) {
+  if (ty->kind == TY_STRUCT || ty->kind == TY_UNION) {
+    println("  stobj %s", to_typename(ty));
+    println("  ldobj %s", to_typename(ty));
+    return;
+  }
+
   if (ty->kind == TY_PTR) {
     println("  conv.u");
     println("  stind.i");
