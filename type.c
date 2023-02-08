@@ -1,5 +1,7 @@
 #include "chibicc.h"
 
+Type *ty_void = &(Type){TY_VOID, 1, 1};
+
 Type *ty_char = &(Type){TY_CHAR, 1, 1};
 Type *ty_short = &(Type){TY_SHORT, 2, 2};
 Type *ty_int = &(Type){TY_INT, 4, 4};

@@ -48,6 +48,8 @@ static const char *to_typename(Type *ty) {
   }
 
   switch (ty->kind) {
+    case TY_VOID:
+      return "void";
     case TY_CHAR:
       return "int8";
     case TY_SHORT:
