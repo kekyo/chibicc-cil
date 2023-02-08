@@ -64,10 +64,8 @@ static const char *to_typename(Type *ty) {
         sprintf(name4, "tag_%p", ty);
         return name4;
       }
-    default:
-      // BUG
-      return "BUG";
   }
+  unreachable();
 }
 
 // Round up `n` to the nearest multiple of `align`. For instance,
@@ -128,10 +126,14 @@ static void load(Type *ty) {
     return;
   }
 
-  if (ty->size == 1)
+  if (ty->size == 1) {
     println("  ldind.i1");
-  else
+    return;
+  } else if (ty->size == 4) {
     println("  ldind.i4");
+    return;
+  }
+  unreachable();
 }
 
 // Store %rax to an address that the stack top is pointing to.
@@ -152,10 +154,17 @@ static void store(Type *ty) {
   if (ty->size == 1) {
     println("  stind.i1");
     println("  ldind.i1");
-  } else {
+    return;
+  } else if (ty->size == 4) {
     println("  stind.i4");
     println("  ldind.i4");
+    return;
+  } else {
+    println("  stind.i8");
+    println("  ldind.i8");
+    return;
   }
+  unreachable();
 }
 
 static void gen_expr(Node *node) {
