@@ -55,6 +55,7 @@ static const char *to_cil_typename(Type *ty) {
     case TY_SHORT:
       return "int16";
     case TY_INT:
+    case TY_ENUM:  // TODO:
       return "int32";
     case TY_LONG:
       return "int64";
