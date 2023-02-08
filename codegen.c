@@ -3,6 +3,15 @@
 static FILE *output_file;
 static Obj *current_fn;
 
+typedef struct UsingType UsingType;
+struct UsingType
+{
+  UsingType *next;
+  Type *ty;
+};
+
+static UsingType *using_type = NULL;
+
 static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
 
@@ -39,6 +48,13 @@ int calculate_size(Type *ty) {
     }
   }
   return -1;
+}
+
+static void add_using_type(Type *ty) {
+  UsingType *pt = calloc(sizeof(UsingType), 1);
+  pt->ty = ty;
+  pt->next = using_type;
+  using_type = pt;
 }
 
 static const char *to_cil_typename(Type *ty) {
@@ -202,7 +218,7 @@ static void gen_expr(Node *node) {
   case ND_ADDR:
     gen_addr(node->lhs);
     return;
-  case ND_SIZEOF:
+  case ND_SIZEOF: {
     switch (node->ty->kind) {
       case TY_ARRAY:
         if (node->ty->array_len == 0) {
@@ -211,7 +227,9 @@ static void gen_expr(Node *node) {
         }
     }
     println("  sizeof %s", to_cil_typename(node->sizeof_ty));
+    add_using_type(node->sizeof_ty);
     return;
+  }
   case ND_ASSIGN:
     gen_addr(node->lhs);
     println("  dup");
@@ -343,30 +361,18 @@ static void gen_stmt(Node *node) {
   error_tok(node->tok, "invalid statement");
 }
 
-static void emit_struct_type(Type *ty) {
+static void aggregate_type(Type *ty) {
   switch (ty->kind) {
     case TY_PTR:
     case TY_ARRAY:
-      emit_struct_type(ty->base);
+      aggregate_type(ty->base);
       break;
     case TY_STRUCT:
-      println(".structure public %s", to_cil_typename(ty));
-      for (Member *mem = ty->members; mem; mem = mem->next) {
-        println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
-      }
-      // Emit member type recursively.
-      for (Member *mem = ty->members; mem; mem = mem->next) {
-        emit_struct_type(mem->ty);
-      }
-      break;
     case TY_UNION:
-      println(".structure public %s explicit", to_cil_typename(ty));
-      for (Member *mem = ty->members; mem; mem = mem->next) {
-        println("  public %s %s 0", to_cil_typename(mem->ty), get_string(mem->name));
-      }
+      add_using_type(ty);
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        emit_struct_type(mem->ty);
+        aggregate_type(mem->ty);
       }
       break;
   }
@@ -374,13 +380,34 @@ static void emit_struct_type(Type *ty) {
 
 static void emit_struct(Obj *prog) {
   for (Obj *fn = prog; fn; fn = fn->next) {
-    if (!fn->is_function)
-      continue;
+    if (fn->is_function) {
+      aggregate_type(fn->ty->return_ty);
 
-    // Included parameter types.
-    for (Obj *var = fn->locals; var; var = var->next) {
-      emit_struct_type(var->ty);
+      // Included parameter types.
+      for (Obj *var = fn->locals; var; var = var->next) {
+        aggregate_type(var->ty);
+      }
+    } else
+      aggregate_type(fn->ty);
+  }
+
+  while (using_type) {
+    Type *ty = using_type->ty;
+    switch (ty->kind) {
+      case TY_STRUCT:
+        println(".structure public %s", to_cil_typename(ty));
+        for (Member *mem = ty->members; mem; mem = mem->next) {
+          println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
+        }
+        break;
+      case TY_UNION:
+        println(".structure public %s explicit", to_cil_typename(ty));
+        for (Member *mem = ty->members; mem; mem = mem->next) {
+          println("  public %s %s 0", to_cil_typename(mem->ty), get_string(mem->name));
+        }
+        break;
     }
+    using_type = using_type->next;
   }
 }
 
@@ -453,7 +480,7 @@ void codegen(Obj *prog, FILE *out) {
   output_file = out;
   
   assign_lvar_offsets(prog);
-  emit_struct(prog);
   emit_data(prog);
   emit_text(prog);
+  emit_struct(prog);
 }
