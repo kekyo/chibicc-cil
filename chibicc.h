@@ -64,13 +64,19 @@ Token *tokenize_file(char *filename);
 // parse.c
 //
 
+typedef enum {
+  OB_GLOBAL,
+  OB_LOCAL,
+  OB_PARAM,
+} ObjKind;
+
 // Variable or function
 typedef struct Obj Obj;
 struct Obj {
   Obj *next;
   char *name;    // Variable name
   Type *ty;      // Type
-  bool is_local; // local or global/function
+  ObjKind kind;
 
   // Local variable
   int offset;
@@ -86,7 +92,6 @@ struct Obj {
   Obj *params;
   Node *body;
   Obj *locals;
-  int stack_size;
 };
 
 // AST node

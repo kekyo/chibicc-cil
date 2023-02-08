@@ -157,7 +157,15 @@ static Obj *new_var(char *name, Type *ty) {
 
 static Obj *new_lvar(char *name, Type *ty) {
   Obj *var = new_var(name, ty);
-  var->is_local = true;
+  var->kind = OB_LOCAL;
+  var->next = locals;
+  locals = var;
+  return var;
+}
+
+static Obj *new_param_lvar(char *name, Type *ty) {
+  Obj *var = new_var(name, ty);
+  var->kind = OB_PARAM;
   var->next = locals;
   locals = var;
   return var;
@@ -165,6 +173,7 @@ static Obj *new_lvar(char *name, Type *ty) {
 
 static Obj *new_gvar(char *name, Type *ty) {
   Obj *var = new_var(name, ty);
+  var->kind = OB_GLOBAL;
   var->next = globals;
   globals = var;
   return var;
@@ -990,7 +999,7 @@ static Token *parse_typedef(Token *tok, Type *basety) {
 static void create_param_lvars(Type *param) {
   if (param) {
     create_param_lvars(param->next);
-    new_lvar(get_ident(param->name), param);
+    new_param_lvar(get_ident(param->name), param);
   }
 }
 
@@ -1009,6 +1018,7 @@ static Token *function(Token *tok, Type *basety) {
   create_param_lvars(ty->params);
   fn->params = locals;
 
+  locals = NULL;
   tok = skip(tok, "{");
   fn->body = compound_stmt(&tok, tok);
   fn->locals = locals;
