@@ -48,6 +48,8 @@ static const char *to_cil_typename(Type *ty) {
   switch (ty->kind) {
     case TY_VOID:
       return "void";
+    case TY_BOOL:
+      return "bool";
     case TY_CHAR:
       return "int8";
     case TY_SHORT:
@@ -218,6 +220,14 @@ static char *cast_table[][10] = {
 static void cast(Type *from, Type *to) {
   if (to->kind == TY_VOID)
     return;
+
+  if (to->kind == TY_BOOL) {
+    println("  ldc.i4.0");
+    println("  ceq");
+    println("  ldc.i4.0");
+    println("  ceq");
+    return;
+  }
 
   int t1 = getTypeId(from);
   int t2 = getTypeId(to);
