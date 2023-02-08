@@ -62,6 +62,12 @@ static const char *to_typename(Type *ty) {
   }
 }
 
+// Round up `n` to the nearest multiple of `align`. For instance,
+// align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
+int align_to(int n, int align) {
+  return (n + align - 1) / align * align;
+}
+
 // Compute the absolute address of a given node.
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
@@ -279,9 +285,9 @@ static void emit_struct_type(Type *ty) {
       emit_struct_type(ty->base);
       break;
     case TY_STRUCT:
-      println(".structure %s", to_typename(ty));
+      println(".structure %s explicit", to_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        println("  %s %s", to_typename(mem->ty), get_string(mem->name));
+        println("  %s %s %d", to_typename(mem->ty), get_string(mem->name), mem->offset);
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
