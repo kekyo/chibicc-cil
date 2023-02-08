@@ -208,10 +208,11 @@ static int getTypeId(Type *ty) {
     return I32;
   case TY_LONG:
     return I64;
+  case TY_PTR:
+  case TY_ARRAY:
+    return IPTR;
   }
-
-  // Will ignore conversion when both nodes are same with TY_STRUCT and another types.
-  return IPTR;
+  error("internal error at %s:%d, %d", __FILE__, __LINE__, ty->kind);
 }
 
 // The table for type casts
@@ -231,6 +232,8 @@ static char *cast_table[][10] = {
 };
 
 static void cast(Type *from, Type *to) {
+  if (from->kind == to->kind)
+    return;
   if (to->kind == TY_VOID)
     return;
 
