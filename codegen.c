@@ -55,10 +55,10 @@ static const char *to_cil_typename(Type *ty) {
     case TY_SHORT:
       return "int16";
     case TY_INT:
-    case TY_ENUM:  // TODO:
       return "int32";
     case TY_LONG:
       return "int64";
+    case TY_ENUM:
     case TY_STRUCT:
     case TY_UNION:
       if (ty->tag) {
@@ -382,11 +382,17 @@ static void gen_stmt(Node *node) {
   error_tok(node->tok, "invalid statement");
 }
 
-static void emit_struct_type(Type *ty) {
+static void emit_type_recursive(Type *ty) {
   switch (ty->kind) {
     case TY_PTR:
     case TY_ARRAY:
-      emit_struct_type(ty->base);
+      emit_type_recursive(ty->base);
+      break;
+    case TY_ENUM:
+      println(".enumeration %s", to_cil_typename(ty));
+      for (EnumMember *mem = ty->enum_members; mem; mem = mem->next) {
+        println("  %s %d", get_string(mem->name), mem->val);
+      }
       break;
     case TY_STRUCT:
     case TY_UNION:
@@ -396,24 +402,24 @@ static void emit_struct_type(Type *ty) {
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        emit_struct_type(mem->ty);
+        emit_type_recursive(mem->ty);
       }
       break;
   }
 }
 
-static void emit_struct(Obj *prog) {
+static void emit_type(Obj *prog) {
   for (Obj *fn = prog; fn; fn = fn->next) {
     if (!fn->is_function)
       continue;
 
     // Included parameter/local variable types.
     for (Obj *var = fn->params; var; var = var->next) {
-      emit_struct_type(var->ty);
+      emit_type_recursive(var->ty);
     }
 
     for (Obj *var = fn->locals; var; var = var->next) {
-      emit_struct_type(var->ty);
+      emit_type_recursive(var->ty);
     }
   }
 }
@@ -486,7 +492,7 @@ void codegen(Obj *prog, FILE *out) {
   output_file = out;
   
   assign_lvar_offsets(prog);
-  emit_struct(prog);
+  emit_type(prog);
   emit_data(prog);
   emit_text(prog);
 }

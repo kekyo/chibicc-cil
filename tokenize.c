@@ -62,9 +62,7 @@ void error_tok(Token *tok, char *fmt, ...) {
 }
 
 char *get_string(Token *tok) {
-  char *str = calloc(tok->len + 1, sizeof(char));
-  strncpy(str, tok->loc, tok->len);
-  return str;
+  return strndup(tok->loc, tok->len);
 }
 
 // Consumes the current token if it matches `op`.
