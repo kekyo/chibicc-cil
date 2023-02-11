@@ -389,16 +389,16 @@ static void emit_type_recursive(Type *ty) {
       emit_type_recursive(ty->base);
       break;
     case TY_ENUM:
-      println(".enumeration %s", to_cil_typename(ty));
+      println(".enumeration public int32 %s", to_cil_typename(ty));
       for (EnumMember *mem = ty->enum_members; mem; mem = mem->next) {
         println("  %s %d", get_string(mem->name), mem->val);
       }
       break;
     case TY_STRUCT:
     case TY_UNION:
-      println(".structure %s explicit", to_cil_typename(ty));
+      println(".structure public %s explicit", to_cil_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        println("  %s %s %d", to_cil_typename(mem->ty), get_string(mem->name), mem->offset);
+        println("  public %s %s %d", to_cil_typename(mem->ty), get_string(mem->name), mem->offset);
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
@@ -449,7 +449,7 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    print(".global %s %s", to_cil_typename(var->ty), var->name);
+    print(".global public %s %s", to_cil_typename(var->ty), var->name);
 
     if (var->init_data) {
       if (var->ty->kind == TY_ARRAY) {
@@ -467,7 +467,7 @@ static void emit_text(Obj *prog) {
     if (!fn->is_function || !fn->is_definition)
       continue;
 
-    print(".function %s %s", to_cil_typename(fn->ty->return_ty), fn->name);
+    print(".function public %s %s", to_cil_typename(fn->ty->return_ty), fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
       print(" %s:%s", var->name, to_cil_typename(var->ty));
     }
