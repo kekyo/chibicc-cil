@@ -552,7 +552,10 @@ static void emit_text(Obj *prog) {
 
     // Prologue
     for (Obj *var = fn->locals; var; var = var->next) {
-      println("  .local %s %s", to_cil_typename(var->ty), var->name);
+      if (var->name[0] != '\0')
+        println("  .local %s %s", to_cil_typename(var->ty), var->name);
+      else
+        println("  .local %s", to_cil_typename(var->ty));
     }
 
     // Emit code
