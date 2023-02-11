@@ -37,3 +37,8 @@ L_EXIT:
     call System.Console.Write string
     ldc.i4.0   ; HACK: Currently void type is not supported.
     ret
+
+; static int static_fn() { return 5; }
+.function file int32 static_fn
+    ldc.i4.s 5
+    ret
