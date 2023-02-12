@@ -363,6 +363,10 @@ static void gen_expr(Node *node) {
     }
     println("  ceq");
     return;
+  case ND_BITNOT:
+    gen_expr(node->lhs);
+    println("  not");
+    return;
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
