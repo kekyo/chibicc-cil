@@ -326,6 +326,15 @@ static void gen_expr(Node *node) {
   case ND_MOD:
     println("  rem");
     return;
+  case ND_BITAND:
+    println("  and");
+    return;
+  case ND_BITOR:
+    println("  or");
+    return;
+  case ND_BITXOR:
+    println("  xor");
+    return;
   case ND_EQ:
     println("  ceq");
     return;
