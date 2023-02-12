@@ -31,6 +31,9 @@ int main() {
   ASSERT(1, ({ char i; sizeof(++i); }));
   ASSERT(1, ({ char i; sizeof(i++); }));
 
+  ASSERT(4, sizeof(int(*)[10]));
+  ASSERT(4, sizeof(int(*)[][10]));
+
   printf("OK\n");
   return 0;
 }
