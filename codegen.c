@@ -282,6 +282,11 @@ static void gen_expr(Node *node) {
     gen_expr(node->lhs);
     cast(node->lhs->ty, node->ty);
     return;
+  case ND_NOT:
+    gen_expr(node->lhs);
+    println("  ldc.i4.0");
+    println("  ceq");
+    return;
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
