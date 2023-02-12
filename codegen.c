@@ -190,7 +190,7 @@ static void store(Type *ty) {
   unreachable();
 }
 
-enum { I8, I16, I32, I64 };
+enum { I8, I16, I32, I64, PTR };
 
 static int getTypeId(Type *ty) {
   switch (ty->kind) {
@@ -200,6 +200,8 @@ static int getTypeId(Type *ty) {
     return I16;
   case TY_INT:
     return I32;
+  case TY_PTR:
+    return PTR;
   }
   return I64;
 }
@@ -209,13 +211,15 @@ static char convi8[] = "conv.i1";
 static char convi16[] = "conv.i2";
 static char convi32[] = "conv.i4";
 static char convi64[] = "conv.i8";
+static char convptr[] = "conv.i";
 
 static char *cast_table[][10] = {
-// to i8   i16      i32      i64       // from
-  {NULL,   NULL,    NULL,    convi64}, // i8
-  {convi8, NULL,    NULL,    convi64}, // i16
-  {convi8, convi16, NULL,    convi64}, // i32
-  {convi8, convi16, convi32, NULL},    // i64
+// to i8   i16      i32      i64      ptr           // from
+  {NULL,   NULL,    NULL,    convi64, convptr },    // i8
+  {convi8, NULL,    NULL,    convi64, convptr },    // i16
+  {convi8, convi16, NULL,    convi64, convptr },    // i32
+  {convi8, convi16, convi32, NULL,    convptr },    // i64
+  {convi8, convi16, convi32, convi64, NULL    },    // ptr
 };
 
 static void cast(Type *from, Type *to) {
