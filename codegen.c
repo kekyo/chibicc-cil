@@ -290,7 +290,10 @@ static void gen_expr(Node *node) {
     return;
   case ND_NOT:
     gen_expr(node->lhs);
-    println("  ldc.i4.0");
+    if (node->lhs->ty->size == 8)
+      println("  ldc.i8 0");
+    else
+      println("  ldc.i4.0");
     println("  ceq");
     return;
   case ND_BITNOT:
