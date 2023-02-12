@@ -30,17 +30,19 @@ static const char *to_cil_typename(Type *ty) {
   if (ty->base) {
     const char *base_name = to_cil_typename(ty->base);
     switch (ty->kind) {
-      case TY_ARRAY:
+      case TY_ARRAY: {
         int length1 = strlen(base_name) + 13;
         char *name1 = calloc(length1 + 1, sizeof(char));
         sprintf(name1, "%s[%d]", base_name, ty->array_len);
         return name1;
-      case TY_PTR:
+      }
+      case TY_PTR: {
         int length2 = strlen(base_name) + 1;
         char *name2 = calloc(length2 + 1, sizeof(char));
         strcpy(name2, base_name);
         strcat(name2, "*");
         return name2;
+      }
     }
     unreachable();
   }
@@ -296,9 +298,8 @@ static void gen_expr(Node *node) {
     println("  not");
     return;
   case ND_FUNCALL:
-    for (Node *arg = node->args; arg; arg = arg->next) {
+    for (Node *arg = node->args; arg; arg = arg->next)
       gen_expr(arg);
-    }
     println("  call %s", node->funcname);
     return;
   }
