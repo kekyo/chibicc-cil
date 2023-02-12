@@ -261,7 +261,7 @@ static Token *read_int_literal(char *start) {
     base = 8;
   }
 
-  long val = strtoul(p, &p, base);
+  int64_t val = strtoll(p, &p, base);
   if (isalnum(*p))
     error_at(p, "invalid digit");
 
