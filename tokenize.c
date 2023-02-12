@@ -231,7 +231,7 @@ static Token *read_char_literal(char *start) {
   if (*p == '\0')
     error_at(start, "unclosed char literal");
 
-  char c;
+  signed char c;
   if (*p == '\\')
     c = read_escaped_char(&p, p + 1);
   else
