@@ -435,6 +435,13 @@ static void gen_stmt(Node *node) {
     for (Node *n = node->body; n; n = n->next)
       gen_stmt(n);
     return;
+  case ND_GOTO:
+    println("  br _L_$%s", node->unique_label);
+    return;
+  case ND_LABEL:
+    println("_L_$%s:", node->unique_label);
+    gen_stmt(node->lhs);
+    return;
   case ND_RETURN:
     gen_expr(node->lhs);
     println("  br _L_return");
