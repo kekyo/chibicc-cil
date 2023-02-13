@@ -420,6 +420,12 @@ static void gen_expr(Node *node, bool will_discard) {
     println("  ldc.i4.0");
     println("  ceq");
     return;
+  case ND_SHL:
+    println("  shl");
+    return;
+  case ND_SHR:
+    println("  shr");
+    return;
   }
 
   error_tok(node->tok, "invalid expression");
