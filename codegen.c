@@ -292,6 +292,20 @@ static void gen_expr(Node *node, bool will_discard) {
     if (!will_discard)
       cast(node->lhs->ty, node->ty);
     return;
+  case ND_COND: {
+    int c = count();
+    gen_expr(node->cond, false);
+    println("  ldc.i4.0");
+    if (node->cond->ty->size == 8)
+      println("  conv.i8");
+    println("  beq _L_else_%d", c);
+    gen_expr(node->then, will_discard);
+    println("  br _L_end_%d", c);
+    println("_L_else_%d:", c);
+    gen_expr(node->els, will_discard);
+    println("_L_end_%d:", c);
+    return;
+  }
   case ND_NOT:
     gen_expr(node->lhs, will_discard);
     if (!will_discard) {
