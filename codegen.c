@@ -292,6 +292,8 @@ static void gen_expr(Node *node, bool will_discard) {
       node->tok->column_no + node->tok->len - 1);
 
   switch (node->kind) {
+  case ND_NULL_EXPR:
+    return;
   case ND_NUM:
     if (!will_discard) {
       if (node->ty->kind == TY_LONG)
