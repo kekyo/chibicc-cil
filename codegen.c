@@ -639,10 +639,8 @@ static void emit_data(Obj *prog) {
     print(".global public %s %s", to_cil_typename(var->ty), var->name);
 
     if (var->init_data) {
-      if (var->ty->kind == TY_ARRAY) {
-        for (int i = 0; i < var->ty->size; i++)
-          print(" 0x%hhx", var->init_data[i]);
-      }
+      for (int i = 0; i < var->ty->size; i++)
+        print(" 0x%hhx", var->init_data[i]);
     }
 
     println("");
