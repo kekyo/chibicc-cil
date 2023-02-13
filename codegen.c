@@ -3,7 +3,7 @@
 static FILE *output_file;
 static Obj *current_fn;
 
-static void gen_expr(Node *node);
+static void gen_expr(Node *node, bool will_discard);
 static void gen_stmt(Node *node);
 
 static void println(char *fmt, ...) {
@@ -89,11 +89,10 @@ static void gen_addr(Node *node) {
     }
     break;
   case ND_DEREF:
-    gen_expr(node->lhs);
+    gen_expr(node->lhs, false);
     return;
   case ND_COMMA:
-    gen_expr(node->lhs);
-    println("  pop");
+    gen_expr(node->lhs, true);
     gen_addr(node->rhs);
     return;
   case ND_MEMBER:
@@ -143,35 +142,41 @@ static void load(Type *ty) {
   unreachable();
 }
 
-static void store(Type *ty) {
+static void store(Type *ty, bool will_discard) {
   if (ty->kind == TY_STRUCT || ty->kind == TY_UNION) {
     println("  stobj %s", to_cil_typename(ty));
-    println("  ldobj %s", to_cil_typename(ty));
+    if (!will_discard)
+      println("  ldobj %s", to_cil_typename(ty));
     return;
   }
 
   if (ty->kind == TY_PTR) {
     println("  conv.u");
     println("  stind.i");
-    println("  ldind.i");
+    if (!will_discard)
+      println("  ldind.i");
     return;
   }
 
   if (ty->size == 1) {
     println("  stind.i1");
-    println("  ldind.i1");
+    if (!will_discard)
+      println("  ldind.i1");
     return;
   } else if (ty->size == 2) {
     println("  stind.i2");
-    println("  ldind.i2");
+    if (!will_discard)
+      println("  ldind.i2");
     return;
   } else if (ty->size == 4) {
     println("  stind.i4");
-    println("  ldind.i4");
+    if (!will_discard)
+      println("  ldind.i4");
     return;
   } else if (ty->size == 8) {
     println("  stind.i8");
-    println("  ldind.i8");
+    if (!will_discard)
+      println("  ldind.i8");
     return;
   }
   unreachable();
@@ -227,110 +232,152 @@ static void cast(Type *from, Type *to) {
     println("  %s", cast_table[t1][t2]);
 }
 
-static void gen_expr(Node *node) {
+static void gen_expr(Node *node, bool will_discard) {
+  println("  .location 1 %d %d %d %d",
+    node->tok->line_no - 1,
+    node->tok->column_no - 1,
+    node->tok->line_no - 1,
+    node->tok->column_no + node->tok->len - 1);
+
   switch (node->kind) {
   case ND_NUM:
-    if (node->ty->kind == TY_LONG)
-      println("  ldc.i8 %ld", node->val);
-    else
-      println("  ldc.i4 %ld", node->val);
+    if (!will_discard) {
+      if (node->ty->kind == TY_LONG)
+        println("  ldc.i8 %ld", node->val);
+      else
+        println("  ldc.i4 %ld", node->val);
+    }
     return;
   case ND_NEG:
-    gen_expr(node->lhs);
-    println("  neg");
+    gen_expr(node->lhs, will_discard);
+    if (!will_discard)
+      println("  neg");
     return;
   case ND_VAR:
   case ND_MEMBER:
-    gen_addr(node);
-    load(node->ty);
+    if (!will_discard) {
+      gen_addr(node);
+      load(node->ty);
+    }
     return;
   case ND_DEREF:
-    gen_expr(node->lhs);
-    load(node->ty);
+    gen_expr(node->lhs, will_discard);
+    if (!will_discard) 
+      load(node->ty);
     return;
   case ND_ADDR:
-    gen_addr(node->lhs);
+    if (!will_discard)
+      gen_addr(node->lhs);
     return;
   case ND_ASSIGN:
     gen_addr(node->lhs);
-    println("  dup");
-    gen_expr(node->rhs);
-    store(node->ty);
+    if (!will_discard)
+      println("  dup");
+    gen_expr(node->rhs, false);
+    store(node->ty, will_discard);
     return;
   case ND_STMT_EXPR:
     for (Node *n = node->body; n; n = n->next)
       if (n->next)
         gen_stmt(n);
       else
-        gen_expr(n->lhs);
+        gen_expr(n->lhs, will_discard);
     return;
   case ND_COMMA:
-    gen_expr(node->lhs);
-    println("  pop");
-    gen_expr(node->rhs);
+    gen_expr(node->lhs, true);
+    gen_expr(node->rhs, will_discard);
     return;
   case ND_CAST:
-    gen_expr(node->lhs);
-    cast(node->lhs->ty, node->ty);
+    gen_expr(node->lhs, will_discard);
+    if (!will_discard)
+      cast(node->lhs->ty, node->ty);
     return;
   case ND_NOT:
-    gen_expr(node->lhs);
-    println("  ldc.i4.0");
-    if (node->lhs->ty->size == 8)
-      println("  conv.i8");
-    println("  ceq");
+    gen_expr(node->lhs, will_discard);
+    if (!will_discard) {
+      println("  ldc.i4.0");
+      if (node->lhs->ty->size == 8)
+        println("  conv.i8");
+      println("  ceq");
+    }
     return;
   case ND_BITNOT:
-    gen_expr(node->lhs);
-    println("  not");
+    gen_expr(node->lhs, will_discard);
+    if (!will_discard)
+      println("  not");
     return;
   case ND_LOGAND: {
     int c = count();
-    gen_expr(node->lhs);
-    println("  ldc.i4.0");
-    if (node->lhs->ty->size == 8)
-      println("  conv.i8");
-    println("  beq.s _L_false_%d", c);
-    gen_expr(node->rhs);
-    println("  ldc.i4.0");
-    if (node->rhs->ty->size == 8)
-      println("  conv.i8");
-    println("  beq.s _L_false_%d", c);
-    println("  ldc.i4.1");
-    println("  br.s _L_end_%d", c);
-    println("_L_false_%d:", c);
-    println("  ldc.i4.0");
-    println("_L_end_%d:", c);
+    if (!will_discard) {
+      gen_expr(node->lhs, false);
+      println("  ldc.i4.0");
+      if (node->lhs->ty->size == 8)
+        println("  conv.i8");
+      println("  beq.s _L_false_%d", c);
+      gen_expr(node->rhs, false);
+      println("  ldc.i4.0");
+      if (node->rhs->ty->size == 8)
+        println("  conv.i8");
+      println("  beq.s _L_false_%d", c);
+      println("  ldc.i4.1");
+      println("  br.s _L_end_%d", c);
+      println("_L_false_%d:", c);
+      println("  ldc.i4.0");
+      println("_L_end_%d:", c);
+    } else {
+      gen_expr(node->lhs, false);
+      println("  ldc.i4.0");
+      if (node->lhs->ty->size == 8)
+        println("  conv.i8");
+      println("  beq.s _L_end_%d", c);
+      gen_expr(node->rhs, true);
+      println("_L_end_%d:", c);
+    }
     return;
   }
   case ND_LOGOR: {
     int c = count();
-    gen_expr(node->lhs);
-    println("  ldc.i4.0");
-    if (node->lhs->ty->size == 8)
-      println("  conv.i8");
-    println("  bne.un.s _L_true_%d", c);
-    gen_expr(node->rhs);
-    println("  ldc.i4.0");
-    if (node->rhs->ty->size == 8)
-      println("  conv.i8");
-    println("  bne.un.s _L_true_%d", c);
-    println("  ldc.i4.0");
-    println("  br.s _L_end_%d", c);
-    println("_L_true_%d:", c);
-    println("  ldc.i4.1");
-    println("_L_end_%d:", c);
+    if (!will_discard) {
+      gen_expr(node->lhs, false);
+      println("  ldc.i4.0");
+      if (node->lhs->ty->size == 8)
+        println("  conv.i8");
+      println("  bne.un.s _L_true_%d", c);
+      gen_expr(node->rhs, false);
+      println("  ldc.i4.0");
+      if (node->rhs->ty->size == 8)
+        println("  conv.i8");
+      println("  bne.un.s _L_true_%d", c);
+      println("  ldc.i4.0");
+      println("  br.s _L_end_%d", c);
+      println("_L_true_%d:", c);
+      println("  ldc.i4.1");
+      println("_L_end_%d:", c);
+    } else {
+      gen_expr(node->lhs, false);
+      println("  ldc.i4.0");
+      if (node->lhs->ty->size == 8)
+        println("  conv.i8");
+      println("  bne.un.s _L_end_%d", c);
+      gen_expr(node->rhs, true);
+      println("_L_end_%d:", c);
+    }
     return;
   }
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next)
-      gen_expr(arg);
+      gen_expr(arg, false);
     println("  call %s", node->funcname);
+    if (will_discard && node->ty->return_ty != ty_void)
+      println("  pop");
     return;
   }
 
-  gen_expr(node->lhs);
-  gen_expr(node->rhs);
+  gen_expr(node->lhs, will_discard);
+  gen_expr(node->rhs, will_discard);
+
+  if (will_discard)
+    return;
 
   switch (node->kind) {
   case ND_ADD:
@@ -388,7 +435,7 @@ static void gen_stmt(Node *node) {
   switch (node->kind) {
   case ND_IF: {
     int c = count();
-    gen_expr(node->cond);
+    gen_expr(node->cond, false);
     println("  brfalse _L_else_%d", c);
     gen_stmt(node->then);
     println("  br _L_end_%d", c);
@@ -404,15 +451,13 @@ static void gen_stmt(Node *node) {
       gen_stmt(node->init);
     println("_L_begin_%d:", c);
     if (node->cond) {
-      gen_expr(node->cond);
+      gen_expr(node->cond, false);
       println("  brfalse %s", node->brk_label);
     }
     gen_stmt(node->then);
     println("%s:", node->cont_label);
-    if (node->inc) {
-      gen_expr(node->inc);
-      println("  pop");
-    }
+    if (node->inc)
+      gen_expr(node->inc, true);
     println("  br _L_begin_%d", c);
     println("%s:", node->brk_label);
     return;
@@ -429,12 +474,11 @@ static void gen_stmt(Node *node) {
     gen_stmt(node->lhs);
     return;
   case ND_RETURN:
-    gen_expr(node->lhs);
+    gen_expr(node->lhs, false);
     println("  br _L_return");
     return;
   case ND_EXPR_STMT:
-    gen_expr(node->lhs);
-    println("  pop");
+    gen_expr(node->lhs, true);
     return;
   }
 
