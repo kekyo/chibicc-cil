@@ -123,6 +123,7 @@ static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
   case ND_SWITCH:
+  case ND_MEMZERO:
     switch (node->var->kind) {
       case OB_GLOBAL:
         // Global variable
@@ -373,6 +374,10 @@ static void gen_expr(Node *node, bool will_discard) {
     gen_expr(node->lhs, will_discard);
     if (!will_discard)
       cast(node->lhs->ty, node->ty);
+    return;
+  case ND_MEMZERO:
+    gen_addr(node);
+    println("  initobj %s", to_cil_typename(node->var->ty));
     return;
   case ND_COND: {
     int c = count();
