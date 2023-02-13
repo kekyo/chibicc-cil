@@ -462,6 +462,37 @@ static void gen_stmt(Node *node) {
     println("%s:", node->brk_label);
     return;
   }
+  case ND_SWITCH:
+    gen_expr(node->cond, false);
+
+    for (Node *n = node->case_next; n; n = n->case_next) {
+      println("  dup");
+      if (node->cond->ty->size == 8)
+        println("  ldc.i8 %ld", n->val);
+      else
+        println("  ldc.i4 %ld", n->val);
+      println("  beq %s", n->label);
+    }
+
+    if (node->default_case)
+      println("  br %s", node->default_case->label);
+    else {
+      println("  pop");
+      println("  br %s", node->brk_label);
+    }
+
+    gen_stmt(node->then);
+    println("%s:", node->brk_label);
+    return;
+  case ND_CASE: {
+    int c = count();
+    println("  br.s _L_fallthrough_%d", c);
+    println("%s:", node->label);
+    println("  pop");
+    println("_L_fallthrough_%d:", c);
+    gen_stmt(node->lhs);
+    return;
+  }
   case ND_BLOCK:
     for (Node *n = node->body; n; n = n->next)
       gen_stmt(n);
