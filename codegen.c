@@ -448,11 +448,30 @@ static void gen_stmt(Node *node) {
   error_tok(node->tok, "invalid statement");
 }
 
-static void emit_type_recursive(Type *ty) {
+typedef struct ProducedType ProducedType;
+struct ProducedType
+{
+  ProducedType *next;
+  Type *ty;
+};
+
+static void emit_type_recursive(Type *ty, ProducedType **produced) {
+  ProducedType *pt = *produced;
+  while (pt != NULL) {
+    if (pt->ty == ty)
+      return;
+    pt = pt->next;
+  }
+
+  pt = calloc(sizeof(ProducedType), 1);
+  pt->ty = ty;
+  pt->next = *produced;
+  *produced = pt;
+
   switch (ty->kind) {
     case TY_PTR:
     case TY_ARRAY:
-      emit_type_recursive(ty->base);
+      emit_type_recursive(ty->base, produced);
       break;
     case TY_ENUM:
       println(".enumeration public int32 %s", to_cil_typename(ty));
@@ -468,24 +487,28 @@ static void emit_type_recursive(Type *ty) {
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        emit_type_recursive(mem->ty);
+        emit_type_recursive(mem->ty, produced);
       }
       break;
   }
 }
 
 static void emit_type(Obj *prog) {
+  ProducedType *produced = NULL;
+
   for (Obj *fn = prog; fn; fn = fn->next) {
     if (!fn->is_function)
       continue;
 
+    emit_type_recursive(fn->ty->return_ty, &produced);
+
     // Included parameter/local variable types.
     for (Obj *var = fn->params; var; var = var->next) {
-      emit_type_recursive(var->ty);
+      emit_type_recursive(var->ty, &produced);
     }
 
     for (Obj *var = fn->locals; var; var = var->next) {
-      emit_type_recursive(var->ty);
+      emit_type_recursive(var->ty, &produced);
     }
   }
 }
