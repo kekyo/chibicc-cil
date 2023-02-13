@@ -594,20 +594,20 @@ static void emit_type_recursive(Type *ty, ProducedType **produced) {
 static void emit_type(Obj *prog) {
   ProducedType *produced = NULL;
 
-  for (Obj *fn = prog; fn; fn = fn->next) {
-    if (!fn->is_function)
-      continue;
+  for (Obj *obj = prog; obj; obj = obj->next) {
+    if (obj->is_function) {
+      emit_type_recursive(obj->ty->return_ty, &produced);
 
-    emit_type_recursive(fn->ty->return_ty, &produced);
+      // Included parameter/local variable types.
+      for (Obj *var = obj->params; var; var = var->next) {
+        emit_type_recursive(var->ty, &produced);
+      }
 
-    // Included parameter/local variable types.
-    for (Obj *var = fn->params; var; var = var->next) {
-      emit_type_recursive(var->ty, &produced);
-    }
-
-    for (Obj *var = fn->locals; var; var = var->next) {
-      emit_type_recursive(var->ty, &produced);
-    }
+      for (Obj *var = obj->locals; var; var = var->next) {
+        emit_type_recursive(var->ty, &produced);
+      }
+    } else
+      emit_type_recursive(obj->ty, &produced);
   }
 }
 
