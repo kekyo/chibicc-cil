@@ -13,7 +13,7 @@ struct UsingType
 static UsingType *using_type = NULL;
 
 static void gen_expr(Node *node);
-static void gen_stmt(Node *node);
+static bool gen_stmt(Node *node);
 
 static void println(char *fmt, ...) {
   va_list ap;
@@ -338,13 +338,26 @@ static void gen_expr(Node *node) {
     gen_expr(node->rhs);
     store(node->ty);
     return;
-  case ND_STMT_EXPR:
-    for (Node *n = node->body; n; n = n->next)
-      if (n->next)
-        gen_stmt(n);
-      else
-        gen_expr(n->lhs);
+  case ND_STMT_EXPR: {
+    bool dead = false;
+    for (Node *n = node->body; n; n = n->next) {
+      if (!dead) {
+        if (n->next) {
+          if (!gen_stmt(n))
+            dead = true;
+        } else
+          gen_expr(n->lhs);
+      } else if (n->kind == ND_LABEL && n->is_resolved_label) {
+        dead = false;
+        if (n->next) {
+          if (!gen_stmt(n))
+            dead = true;
+        } else
+          gen_expr(n->lhs);
+      }
+    }
     return;
+  }
   case ND_COMMA:
     gen_expr(node->lhs);
     println("  pop");
@@ -473,7 +486,8 @@ static void gen_expr(Node *node) {
   error_tok(node->tok, "invalid expression");
 }
 
-static void gen_stmt(Node *node) {
+// When true is returned, the execution flow continues.
+static bool gen_stmt(Node *node) {
   if (node->tok)
     println("  .location 1 %d %d %d %d",
       node->tok->line_no - 1,
@@ -486,18 +500,20 @@ static void gen_stmt(Node *node) {
     int c = count();
     gen_expr(node->cond);
     println("  brfalse _L_else_%d", c);
-    gen_stmt(node->then);
-    println("  br _L_end_%d", c);
+    if (gen_stmt(node->then))
+      println("  br _L_end_%d", c);
     println("_L_else_%d:", c);
     if (node->els)
       gen_stmt(node->els);
     println("_L_end_%d:", c);
-    return;
+    return true;
   }
   case ND_FOR: {
     int c = count();
-    if (node->init)
-      gen_stmt(node->init);
+    if (node->init) {
+      if (!gen_stmt(node->init))
+        unreachable();
+    }
     println("_L_begin_%d:", c);
     if (node->cond) {
       gen_expr(node->cond);
@@ -510,20 +526,38 @@ static void gen_stmt(Node *node) {
     }
     println("  br _L_begin_%d", c);
     println("_L_end_%d:", c);
-    return;
+    return true;
   }
-  case ND_BLOCK:
-    for (Node *n = node->body; n; n = n->next)
-      gen_stmt(n);
-    return;
+  case ND_BLOCK: {
+    Node *n = node->body;
+    bool dead = false;
+    while (n) {
+      if (!dead) {
+        if (!gen_stmt(n))
+          dead = true;
+      } else if (n->kind == ND_LABEL && n->is_resolved_label) {
+        dead = false;
+        if (!gen_stmt(n))
+          dead = true;
+      }
+      n = n->next;
+    }
+    return !dead;
+  }
+  case ND_GOTO:
+    println("  br _L_$%s", node->unique_label);
+    return false;
+  case ND_LABEL:
+    println("_L_$%s:", node->unique_label);
+    return gen_stmt(node->lhs);
   case ND_RETURN:
     gen_expr(node->lhs);
     println("  br _L_return");
-    return;
+    return false;
   case ND_EXPR_STMT:
     gen_expr(node->lhs);
     println("  pop");
-    return;
+    return true;
   }
 
   error_tok(node->tok, "invalid statement");
