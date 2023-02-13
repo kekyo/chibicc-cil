@@ -137,6 +137,9 @@ static void gen_addr(Node *node) {
         // Parameter variable
         println("  ldarga %d", node->var->offset);
         return;
+      default:
+        unreachable();
+        break;
     }
     unreachable();
     return;
