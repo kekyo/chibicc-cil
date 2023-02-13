@@ -30,19 +30,10 @@ static const char *to_cil_typename(Type *ty) {
   if (ty->base) {
     const char *base_name = to_cil_typename(ty->base);
     switch (ty->kind) {
-      case TY_ARRAY: {
-        int length1 = strlen(base_name) + 13;
-        char *name1 = calloc(length1 + 1, sizeof(char));
-        sprintf(name1, "%s[%d]", base_name, ty->array_len);
-        return name1;
-      }
-      case TY_PTR: {
-        int length2 = strlen(base_name) + 1;
-        char *name2 = calloc(length2 + 1, sizeof(char));
-        strcpy(name2, base_name);
-        strcat(name2, "*");
-        return name2;
-      }
+      case TY_ARRAY:
+        return format("%s[%d]", base_name, ty->array_len);
+      case TY_PTR:
+        return format("%s*", base_name);
     }
     unreachable();
   }
@@ -63,16 +54,10 @@ static const char *to_cil_typename(Type *ty) {
     case TY_ENUM:
     case TY_STRUCT:
     case TY_UNION:
-      if (ty->tag) {
-        char *tag_name = get_string(ty->tag);
-        char *name3 = calloc(strlen(tag_name) + 1 + 18 + 1, sizeof(char));
-        sprintf(name3, "%s_%p", tag_name, ty);
-        return name3;
-      } else {
-        char *name4 = calloc(4 + 18 + 1, sizeof(char));
-        sprintf(name4, "tag_%p", ty);
-        return name4;
-      }
+      if (ty->tag)
+        return format("%s_%p", get_string(ty->tag), ty);
+      else
+        return format("tag_%p", ty);
   }
   unreachable();
 }
