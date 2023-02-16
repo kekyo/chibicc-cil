@@ -7,3 +7,4 @@
 /chibicc
 /test/*.exe
 .vscode/*
+.vs/*

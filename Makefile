@@ -1,7 +1,7 @@
 AS=chibias
 
 CFLAGS=-std=c11 -g -fno-common
-ASFLAGS=-f net45 -r mscorlib.dll
+ASFLAGS=-f net45 -w x86 -r mscorlib.dll
 
 SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)

@@ -636,14 +636,53 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    print(".global public %s %s", to_cil_typename(var->ty), var->name);
+    println(".global public %s %s", to_cil_typename(var->ty), var->name);
 
     if (var->init_data) {
+      bool initdata_available = false;
       for (int i = 0; i < var->ty->size; i++)
-        print(" 0x%hhx", var->init_data[i]);
-    }
+        if (var->init_data[i]) {
+          initdata_available = true;
+          break;
+        }
 
-    println("");
+      if (initdata_available) {
+        print(".global internal %s initdata_$%s", to_cil_typename(var->ty), var->name);
+        for (int i = 0; i < var->ty->size; i++)
+          print(" 0x%hhx", var->init_data[i]);
+        println("");
+      }
+
+      Relocation *rel = var->rel;
+      println(".initializer internal");
+
+      if (initdata_available) {
+        println("  ldsfld initdata_$%s", var->name);
+        println("  stsfld %s", var->name);
+      }
+
+      if (rel) {
+        println("  ldsflda %s", var->name);
+        do {
+          if (rel->next)
+            println("  dup");
+          if (rel->offset != 0) {
+            println("  ldc.i4 %d", rel->offset);
+            println("  conv.i");
+            println("  add");
+          }
+          println("  ldsflda %s", rel->label);
+          if (rel->addend != 0) {
+            println("  ldc.i8 %ld", rel->addend);
+            println("  conv.i");
+            println("  add");
+          }
+          println("  stind.i");
+          rel = rel->next;
+        } while (rel);
+      }
+      println("  ret");
+    }
   }
 }
 

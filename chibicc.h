@@ -17,6 +17,7 @@ typedef struct Type Type;
 typedef struct Node Node;
 typedef struct Member Member;
 typedef struct EnumMember EnumMember;
+typedef struct Relocation Relocation;
 
 //
 // strings.c
@@ -93,11 +94,23 @@ struct Obj {
 
   // Global variable
   char *init_data;
+  Relocation *rel;
 
   // Function
   Obj *params;
   Node *body;
   Obj *locals;
+};
+
+// Global variable can be initialized either by a constant expression
+// or a pointer to another global variable. This struct represents the
+// latter.
+typedef struct Relocation Relocation;
+struct Relocation {
+  Relocation *next;
+  int offset;
+  char *label;
+  long addend;
 };
 
 // AST node
