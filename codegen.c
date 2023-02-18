@@ -285,9 +285,9 @@ static void emit_struct_type(Type *ty) {
       emit_struct_type(ty->base);
       break;
     case TY_STRUCT:
-      println(".structure %s", to_typename(ty));
+      println(".structure public %s", to_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        println("  %s %s", to_typename(mem->ty), get_string(mem->name));
+        println("  public %s %s", to_typename(mem->ty), get_string(mem->name));
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
@@ -329,7 +329,7 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    print(".global %s %s", to_typename(var->ty), var->name);
+    print(".global public %s %s", to_typename(var->ty), var->name);
 
     if (var->init_data) {
       if (var->ty->kind == TY_ARRAY) {
@@ -347,7 +347,7 @@ static void emit_text(Obj *prog) {
     if (!fn->is_function)
       continue;
 
-    print(".function int32 %s", fn->name);
+    print(".function public int32 %s", fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
       print(" %s:%s", var->name, to_typename(var->ty));
     }

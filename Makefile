@@ -1,4 +1,4 @@
-AS=chibias
+AS=chibias -f net45
 
 CFLAGS=-std=c11 -g -fno-common
 ASFLAGS=-r mscorlib.dll

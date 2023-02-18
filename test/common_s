@@ -1,5 +1,5 @@
 ; void assert(int expected, int actual, char *code)
-.function int32 assert expected:int32 actual:int32 code:int8*
+.function internal int32 assert expected:int32 actual:int32 code:int8*
     ; if (expected == actual)
     ldarg.0
     ldarg.1
@@ -31,7 +31,7 @@ L_EXIT:
     ret
 
 ; void printf(char *arg)
-.function int32 printf arg:int8*
+.function internal int32 printf arg:int8*
     ldarg.0
     call System.Runtime.InteropServices.Marshal.PtrToStringAnsi intptr
     call System.Console.Write string
