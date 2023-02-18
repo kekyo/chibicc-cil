@@ -197,6 +197,18 @@ static void gen_expr(Node *node) {
     println("  pop");
     gen_expr(node->rhs);
     return;
+  case ND_COND: {
+    int c = count();
+    gen_expr(node->cond);
+    println("  ldc.i4.0");
+    println("  beq _L_else_%d", c);
+    gen_expr(node->then);
+    println("  br _L_end_%d", c);
+    println("_L_else_%d:", c);
+    gen_expr(node->els);
+    println("_L_end_%d:", c);
+    return;
+  }
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
