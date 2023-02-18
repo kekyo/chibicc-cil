@@ -102,6 +102,31 @@ static Node *new_num(int val, Token *tok) {
   return node;
 }
 
+static int calculate_size(Type *ty, Token *tok) {
+  switch (ty->kind) {
+    case TY_CHAR:
+      return 1;
+    case TY_INT:
+      return 4;
+    case TY_ARRAY:
+      int sz = calculate_size(ty->base, tok);
+      if (sz >= 0) {
+        return sz * ty->array_len;
+      }
+  }
+  return -1;
+}
+
+static Node *new_sizeof(Type *ty, Token *tok) {
+  int size = calculate_size(ty, tok);
+  if (size >= 0)
+    return new_num(size, tok);
+
+  Node *node = new_node(ND_SIZEOF, tok);
+  node->ty = ty;
+  return node;
+}
+
 static Node *new_var_node(Obj *var, Token *tok) {
   Node *node = new_node(ND_VAR, tok);
   node->var = var;
@@ -152,6 +177,7 @@ static Obj *new_anon_gvar(Type *ty) {
 static Obj *new_string_literal(char *p, Type *ty) {
   Obj *var = new_anon_gvar(ty);
   var->init_data = p;
+  var->init_data_size = strlen(p) + 1;
   return var;
 }
 
@@ -466,7 +492,7 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   }
 
   // ptr + num
-  rhs = new_binary(ND_MUL, rhs, new_num(lhs->ty->base->size, tok), tok);
+  rhs = new_binary(ND_MUL, rhs, new_sizeof(lhs->ty->base, tok), tok);
   return new_binary(ND_ADD, lhs, rhs, tok);
 }
 
@@ -481,7 +507,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
 
   // ptr - num
   if (lhs->ty->base && is_integer(rhs->ty)) {
-    rhs = new_binary(ND_MUL, rhs, new_num(lhs->ty->base->size, tok), tok);
+    rhs = new_binary(ND_MUL, rhs, new_sizeof(lhs->ty->base, tok), tok);
     add_type(rhs);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node->ty = lhs->ty;
@@ -492,7 +518,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
   if (lhs->ty->base && rhs->ty->base) {
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node->ty = ty_int;
-    return new_binary(ND_DIV, node, new_num(lhs->ty->base->size, tok), tok);
+    return new_binary(ND_DIV, node, new_sizeof(lhs->ty->base, tok), tok);
   }
 
   error_tok(tok, "invalid operands");
@@ -584,6 +610,81 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
   ty->members = head.next;
 }
 
+// Evaluate a given node as a constant expression.
+static Node *reduce(Node *node) {
+  add_type(node);
+
+  Node *lhs;
+  Node *rhs;
+  Node *cond;
+  switch (node->kind) {
+  case ND_ADD:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val + rhs->val, node->tok);
+    else
+      return new_binary(ND_ADD, lhs, rhs, node->tok);
+  case ND_SUB:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val - rhs->val, node->tok);
+    else
+      return new_binary(ND_SUB, lhs, rhs, node->tok);
+  case ND_MUL:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val * rhs->val, node->tok);
+    else
+      return new_binary(ND_MUL, lhs, rhs, node->tok);
+  case ND_DIV:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val / rhs->val, node->tok);
+    else
+      return new_binary(ND_DIV, lhs, rhs, node->tok);
+  case ND_NEG:
+    lhs = reduce(node->lhs);
+    if (lhs->kind == ND_NUM)
+      return new_num(-lhs->val, node->tok);
+    else
+      return new_unary(ND_NEG, lhs, node->tok);
+  case ND_EQ:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val == rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_EQ, lhs, rhs, node->tok);
+  case ND_NE:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val != rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_NE, lhs, rhs, node->tok);
+  case ND_LT:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val < rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_LT, lhs, rhs, node->tok);
+  case ND_LE:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val <= rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_LE, lhs, rhs, node->tok);
+  }
+
+  return node;
+}
+
 // struct-decl = "{" struct-members
 static Type *struct_decl(Token **rest, Token *tok) {
   tok = skip(tok, "{");
@@ -594,12 +695,11 @@ static Type *struct_decl(Token **rest, Token *tok) {
   struct_members(rest, tok, ty);
 
   // Assign offsets within the struct to members.
-  int offset = 0;
+  Node *offset = new_num(0, tok);
   for (Member *mem = ty->members; mem; mem = mem->next) {
     mem->offset = offset;
-    offset += mem->ty->size;
+    offset = reduce(new_binary(ND_ADD, offset, new_sizeof(mem->ty, tok), tok));
   }
-  ty->size = offset;
 
   return ty;
 }
@@ -693,7 +793,7 @@ static Node *primary(Token **rest, Token *tok) {
   if (equal(tok, "sizeof")) {
     Node *node = unary(rest, tok->next);
     add_type(node);
-    return new_num(node->ty->size, tok);
+    return new_sizeof(node->ty, tok);
   }
 
   if (tok->kind == TK_IDENT) {

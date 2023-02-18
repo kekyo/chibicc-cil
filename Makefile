@@ -1,7 +1,7 @@
-AS=chibias -f net45
+AS=chibias
 
 CFLAGS=-std=c11 -g -fno-common
-ASFLAGS=-r mscorlib.dll
+ASFLAGS=-f net45 -w x86 -r mscorlib.dll
 
 SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)
@@ -20,6 +20,7 @@ test/%.exe: chibicc test/%.c
 
 test: $(TESTS)
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
+#	for i in $^; do echo $$i; mono ./$$i || exit 1; echo; done
 	test/driver.sh
 
 clean:

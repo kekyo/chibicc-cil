@@ -84,7 +84,7 @@ static void gen_addr(Node *node) {
     return;
   case ND_MEMBER:
     gen_addr(node->lhs);
-    println("  ldc.i4 %d", node->member->offset);
+    gen_expr(node->member->offset);
     println("  add");
     return;
   }
@@ -104,33 +104,42 @@ static void load(Type *ty) {
     return;
   }
 
-  if (ty->kind == TY_PTR) {
-    println("  ldind.i");
-    return;
+  switch (ty->kind) {
+    case TY_PTR:
+      println("  ldind.i");
+      return;
+    case TY_CHAR:
+      println("  ldind.i1");
+      return;
+    case TY_INT:
+      println("  ldind.i4");
+      return;
   }
 
-  if (ty->size == 1)
-    println("  ldind.i1");
-  else
-    println("  ldind.i4");
+  // BUG
+  println("  BUG");
 }
 
 // Store %rax to an address that the stack top is pointing to.
 static void store(Type *ty) {
-  if (ty->kind == TY_PTR) {
-    println("  conv.u");
-    println("  stind.i");
-    println("  ldind.i");
-    return;
+  switch (ty->kind) {
+    case TY_PTR:
+      println("  conv.u");
+      println("  stind.i");
+      println("  ldind.i");
+      return;
+    case TY_CHAR:
+      println("  stind.i1");
+      println("  ldind.i1");
+      return;
+    case TY_INT:
+      println("  stind.i4");
+      println("  ldind.i4");
+      return;
   }
 
-  if (ty->size == 1) {
-    println("  stind.i1");
-    println("  ldind.i1");
-  } else {
-    println("  stind.i4");
-    println("  ldind.i4");
-  }
+  // BUG
+  println("  BUG");
 }
 
 static void gen_expr(Node *node) {
@@ -159,6 +168,22 @@ static void gen_expr(Node *node) {
     return;
   case ND_ADDR:
     gen_addr(node->lhs);
+    return;
+  case ND_SIZEOF:
+    switch (node->ty->kind) {
+      case TY_STRUCT:
+        if (node->ty->members == NULL) {
+          println("  ldc.i4.0");
+          return;
+        }
+        break;
+      case TY_ARRAY:
+        if (node->ty->array_len == 0) {
+          println("  ldc.i4.0");
+          return;
+        }
+    }
+    println("  sizeof %s", to_typename(node->ty));
     return;
   case ND_ASSIGN:
     gen_addr(node->lhs);
@@ -285,7 +310,7 @@ static void emit_struct_type(Type *ty) {
       emit_struct_type(ty->base);
       break;
     case TY_STRUCT:
-      println(".structure public %s", to_typename(ty));
+      println(".structure public %s 1", to_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
         println("  public %s %s", to_typename(mem->ty), get_string(mem->name));
       }
@@ -333,7 +358,7 @@ static void emit_data(Obj *prog) {
 
     if (var->init_data) {
       if (var->ty->kind == TY_ARRAY) {
-        for (int i = 0; i < var->ty->size; i++)
+        for (int i = 0; i < var->init_data_size; i++)
           print(" 0x%hhx", var->init_data[i]);
       }
     }

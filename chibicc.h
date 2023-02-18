@@ -77,6 +77,7 @@ struct Obj {
 
   // Global variable
   char *init_data;
+  int init_data_size;
 
   // Function
   Obj *params;
@@ -101,6 +102,7 @@ typedef enum {
   ND_MEMBER,    // . (struct member access)
   ND_ADDR,      // unary &
   ND_DEREF,     // unary *
+  ND_SIZEOF,    // sizeof
   ND_RETURN,    // "return"
   ND_IF,        // "if"
   ND_FOR,       // "for" or "while"
@@ -160,7 +162,6 @@ typedef enum {
 
 struct Type {
   TypeKind kind;
-  int size;      // sizeof() value
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -192,7 +193,7 @@ struct Member {
   Member *next;
   Type *ty;
   Token *name;
-  int offset;
+  Node *offset;
 };
 
 extern Type *ty_char;
