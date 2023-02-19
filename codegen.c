@@ -48,12 +48,14 @@ static const char *to_typename(Type *ty) {
   }
 
   switch (ty->kind) {
+    case TY_CHAR:
+      return "int8";
+    case TY_SHORT:
+      return "int16";
     case TY_INT:
       return "int32";
     case TY_LONG:
       return "int64";
-    case TY_CHAR:
-      return "int8";
     case TY_STRUCT:
     case TY_UNION:
       if (ty->tag) {
@@ -121,6 +123,9 @@ static void load(Type *ty) {
     case TY_CHAR:
       println("  ldind.i1");
       return;
+    case TY_SHORT:
+      println("  ldind.i2");
+      return;
     case TY_INT:
       println("  ldind.i4");
       return;
@@ -147,6 +152,10 @@ static void store(Type *ty) {
     case TY_CHAR:
       println("  stind.i1");
       println("  ldind.i1");
+      return;
+    case TY_SHORT:
+      println("  stind.i2");
+      println("  ldind.i2");
       return;
     case TY_INT:
       println("  stind.i4");
