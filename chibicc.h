@@ -159,6 +159,7 @@ typedef enum {
   TY_FUNC,
   TY_ARRAY,
   TY_STRUCT,
+  TY_UNION,
 } TypeKind;
 
 struct Type {
