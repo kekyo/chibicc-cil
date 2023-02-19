@@ -179,10 +179,48 @@ static void store(Type *ty) {
   unreachable();
 }
 
+enum { I8, I16, I32, I64 };
+
+static int getTypeId(Type *ty) {
+  switch (ty->kind) {
+  case TY_CHAR:
+    return I8;
+  case TY_SHORT:
+    return I16;
+  case TY_INT:
+    return I32;
+  }
+  return I64;
+}
+
+// The table for type casts
+static char convi8[] = "conv.i1";
+static char convi16[] = "conv.i2";
+static char convi32[] = "conv.i4";
+static char convi64[] = "conv.i8";
+
+static char *cast_table[][10] = {
+// to i8   i16      i32      i64       // from
+  {NULL,   NULL,    NULL,    convi64}, // i8
+  {convi8, NULL,    NULL,    convi64}, // i16
+  {convi8, convi16, NULL,    convi64}, // i32
+  {convi8, convi16, convi32, NULL},    // i64
+};
+
+static void cast(Type *from, Type *to) {
+  if (to->kind == TY_VOID)
+    return;
+
+  int t1 = getTypeId(from);
+  int t2 = getTypeId(to);
+  if (cast_table[t1][t2])
+    println("  %s", cast_table[t1][t2]);
+}
+
 static void gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NUM:
-    println("  ldc.i4 %ld", node->val);
+    println("  ldc.i8 %ld", node->val);
     return;
   case ND_NEG:
     gen_expr(node->lhs);
@@ -233,6 +271,10 @@ static void gen_expr(Node *node) {
     gen_expr(node->lhs);
     println("  pop");
     gen_expr(node->rhs);
+    return;
+  case ND_CAST:
+    gen_expr(node->lhs);
+    cast(node->lhs->ty, node->ty);
     return;
   case ND_COND: {
     int c = count();
