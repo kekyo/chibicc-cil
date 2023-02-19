@@ -64,10 +64,8 @@ static const char *to_typename(Type *ty) {
         sprintf(name4, "tag_%p", ty);
         return name4;
       }
-    default:
-      // BUG
-      return "BUG";
   }
+  unreachable();
 }
 
 // Compute the absolute address of a given node.
@@ -125,9 +123,7 @@ static void load(Type *ty) {
       println("  ldind.i4");
       return;
   }
-
-  // BUG
-  println("  BUG");
+  unreachable();
 }
 
 // Store ev to an address that the stack top is pointing to.
@@ -152,9 +148,7 @@ static void store(Type *ty) {
       println("  ldind.i4");
       return;
   }
-
-  // BUG
-  println("  BUG");
+  unreachable();
 }
 
 static void gen_expr(Node *node) {
