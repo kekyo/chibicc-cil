@@ -182,6 +182,7 @@ struct Type {
   int array_len;
 
   // Struct
+  Token *tag;
   Member *members;
 
   // Function type
