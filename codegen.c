@@ -100,19 +100,21 @@ static void gen_addr(Node *node) {
   error_tok(node->tok, "not an lvalue");
 }
 
-// Load a value from where %rax is pointing to.
+// Load a value from where ev is pointing to.
 static void load(Type *ty) {
-  if (ty->kind == TY_ARRAY) {
-    // If it is an array, do not attempt to load a value to the
-    // register because in general we can't load an entire array to a
-    // register. As a result, the result of an evaluation of an array
-    // becomes not the array itself but the address of the array.
-    // This is where "array is automatically converted to a pointer to
-    // the first element of the array in C" occurs.
-    return;
-  }
-
   switch (ty->kind) {
+    case TY_ARRAY:
+      // If it is an array, do not attempt to load a value to the
+      // register because in general we can't load an entire array to a
+      // register. As a result, the result of an evaluation of an array
+      // becomes not the array itself but the address of the array.
+      // This is where "array is automatically converted to a pointer to
+      // the first element of the array in C" occurs.
+      return;
+    case TY_STRUCT:
+    case TY_UNION:
+      println("  ldobj %s", to_typename(ty));
+      return;
     case TY_PTR:
       println("  ldind.i");
       return;
@@ -128,9 +130,14 @@ static void load(Type *ty) {
   println("  BUG");
 }
 
-// Store %rax to an address that the stack top is pointing to.
+// Store ev to an address that the stack top is pointing to.
 static void store(Type *ty) {
   switch (ty->kind) {
+    case TY_STRUCT:
+    case TY_UNION:
+      println("  stobj %s", to_typename(ty));
+      println("  ldobj %s", to_typename(ty));
+      return;
     case TY_PTR:
       println("  conv.u");
       println("  stind.i");
