@@ -41,10 +41,8 @@ static const char *to_cil_typename(Type *ty) {
         strcpy(name2, base_name);
         strcat(name2, "*");
         return name2;
-      default:
-        // BUG
-        return base_name;
     }
+    unreachable();
   }
 
   switch (ty->kind) {
@@ -220,7 +218,10 @@ static void cast(Type *from, Type *to) {
 static void gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NUM:
-    println("  ldc.i8 %ld", node->val);
+    if (node->ty->kind == TY_LONG)
+      println("  ldc.i8 %ld", node->val);
+    else
+      println("  ldc.i4 %ld", node->val);
     return;
   case ND_NEG:
     gen_expr(node->lhs);

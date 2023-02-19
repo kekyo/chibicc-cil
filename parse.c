@@ -134,6 +134,13 @@ static Node *new_num(int64_t val, Token *tok) {
   return node;
 }
 
+static Node *new_long(int64_t val, Token *tok) {
+  Node *node = new_node(ND_NUM, tok);
+  node->val = val;
+  node->ty = ty_long;
+  return node;
+}
+
 static int calculate_size(Type *ty, Token *tok) {
   switch (ty->kind) {
     case TY_CHAR:
@@ -165,7 +172,7 @@ static Node *new_var_node(Obj *var, Token *tok) {
   return node;
 }
 
-static Node *new_cast(Node *expr, Type *ty) {
+Node *new_cast(Node *expr, Type *ty) {
   add_type(expr);
 
   Node *node = calloc(1, sizeof(Node));
