@@ -255,11 +255,12 @@ static void gen_expr(Node *node) {
 }
 
 static void gen_stmt(Node *node) {
-  println("  .location 1 %d %d %d %d",
-    node->tok->line_no - 1,
-    node->tok->column_no - 1,
-    node->tok->line_no - 1,
-    node->tok->column_no + node->tok->len - 1);
+  if (node->tok)
+    println("  .location 1 %d %d %d %d",
+      node->tok->line_no - 1,
+      node->tok->column_no - 1,
+      node->tok->line_no - 1,
+      node->tok->column_no + node->tok->len - 1);
 
   switch (node->kind) {
   case ND_IF: {
@@ -316,7 +317,7 @@ static void emit_struct_type(Type *ty) {
       emit_struct_type(ty->base);
       break;
     case TY_STRUCT:
-      println(".structure public %s 1", to_typename(ty));
+      println(".structure public %s", to_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
         println("  public %s %s", to_typename(mem->ty), get_string(mem->name));
       }

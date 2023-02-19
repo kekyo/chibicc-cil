@@ -1,7 +1,13 @@
 #include "chibicc.h"
 
-Type *ty_char = &(Type){TY_CHAR};
-Type *ty_int = &(Type){TY_INT};
+Type *ty_char = &(Type){TY_CHAR, &(Node){ND_NUM, 1}};
+Type *ty_int = &(Type){TY_INT, &(Node){ND_NUM, 4}};
+
+static Type *new_type(TypeKind kind) {
+  Type *ty = calloc(1, sizeof(Type));
+  ty->kind = kind;
+  return ty;
+}
 
 bool is_integer(Type *ty) {
   return ty->kind == TY_CHAR || ty->kind == TY_INT;
@@ -13,10 +19,10 @@ Type *copy_type(Type *ty) {
   return ret;
 }
 
-Type *pointer_to(Type *base) {
-  Type *ty = calloc(1, sizeof(Type));
-  ty->kind = TY_PTR;
+Type *pointer_to(Type *base, Token *tok) {
+  Type *ty = new_type(TY_PTR);
   ty->base = base;
+  ty->align = new_sizeof(ty, tok);
   return ty;
 }
 
@@ -28,10 +34,10 @@ Type *func_type(Type *return_ty) {
 }
 
 Type *array_of(Type *base, int len) {
-  Type *ty = calloc(1, sizeof(Type));
-  ty->kind = TY_ARRAY;
+  Type *ty = new_type(TY_ARRAY);
   ty->base = base;
   ty->array_len = len;
+  ty->align = base->align;
   return ty;
 }
 
@@ -87,9 +93,9 @@ void add_type(Node *node) {
     return;
   case ND_ADDR:
     if (node->lhs->ty->kind == TY_ARRAY)
-      node->ty = pointer_to(node->lhs->ty->base);
+      node->ty = pointer_to(node->lhs->ty->base, node->tok);
     else
-      node->ty = pointer_to(node->lhs->ty);
+      node->ty = pointer_to(node->lhs->ty, node->tok);
     return;
   case ND_DEREF:
     if (!node->lhs->ty->base)

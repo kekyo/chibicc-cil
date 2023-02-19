@@ -117,6 +117,7 @@ typedef enum {
 // AST node type
 struct Node {
   NodeKind kind; // Node kind
+  int val;       // Used if kind == ND_NUM
   Node *next;    // Next node
   Type *ty;      // Type, e.g. int or pointer to int
   Token *tok;    // Representative token
@@ -142,9 +143,9 @@ struct Node {
   Node *args;
 
   Obj *var;      // Used if kind == ND_VAR
-  int val;       // Used if kind == ND_NUM
 };
 
+Node *new_sizeof(Type *ty, Token *tok);
 Obj *parse(Token *tok);
 
 //
@@ -162,6 +163,7 @@ typedef enum {
 
 struct Type {
   TypeKind kind;
+  Node *align;     // alignment
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -201,7 +203,7 @@ extern Type *ty_int;
 
 bool is_integer(Type *ty);
 Type *copy_type(Type *ty);
-Type *pointer_to(Type *base);
+Type *pointer_to(Type *base, Token *tok);
 Type *func_type(Type *return_ty);
 Type *array_of(Type *base, int size);
 void add_type(Node *node);
