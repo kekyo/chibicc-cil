@@ -26,7 +26,7 @@ struct VarScope {
   Obj *var;
 };
 
-// Scope for struct tags
+// Scope for struct or union tags
 typedef struct TagScope TagScope;
 struct TagScope {
   TagScope *next;
@@ -67,6 +67,7 @@ static Node *relational(Token **rest, Token *tok);
 static Node *add(Token **rest, Token *tok);
 static Node *mul(Token **rest, Token *tok);
 static Type *struct_decl(Token **rest, Token *tok);
+static Type *union_decl(Token **rest, Token *tok);
 static Node *postfix(Token **rest, Token *tok);
 static Node *unary(Token **rest, Token *tok);
 static Node *primary(Token **rest, Token *tok);
@@ -224,6 +225,9 @@ static Type *declspec(Token **rest, Token *tok) {
   if (equal(tok, "struct"))
     return struct_decl(rest, tok->next);
 
+  if (equal(tok, "union"))
+    return union_decl(rest, tok->next);
+
   error_tok(tok, "typename expected");
 }
 
@@ -309,7 +313,8 @@ static Node *declaration(Token **rest, Token *tok) {
 
 // Returns true if a given token represents a type.
 static bool is_typename(Token *tok) {
-  return equal(tok, "char") || equal(tok, "int") || equal(tok, "struct");
+  return equal(tok, "char") || equal(tok, "int") || equal(tok, "struct") ||
+         equal(tok, "union");
 }
 
 // stmt = "return" expr ";"
@@ -722,9 +727,9 @@ static Node *align_to_node(Node *n, Node *align, Token *tok) {
     ND_MUL, based, align, tok);
 }
 
-// struct-decl = ident? "{" struct-members
-static Type *struct_decl(Token **rest, Token *tok) {
-  // Read a struct tag.
+// struct-union-decl = ident? ("{" struct-members)?
+static Type *struct_union_decl(Token **rest, Token *tok) {
+  // Read a tag.
   Token *tag = NULL;
   if (tok->kind == TK_IDENT) {
     tag = tok;
@@ -741,10 +746,20 @@ static Type *struct_decl(Token **rest, Token *tok) {
 
   // Construct a struct object.
   Type *ty = calloc(1, sizeof(Type));
-  ty->kind = TY_STRUCT;
   ty->tag = tag;
   struct_members(rest, tok->next, ty);
   ty->align = new_num(1, tok);
+
+  // Register the struct type if a name was given.
+  if (tag)
+    push_tag_scope(tag, ty);
+  return ty;
+}
+
+// struct-decl = struct-union-decl
+static Type *struct_decl(Token **rest, Token *tok) {
+  Type *ty = struct_union_decl(rest, tok);
+  ty->kind = TY_STRUCT;
 
   // Assign offsets within the struct to members.
   Node *offset = new_num(0, tok);
@@ -753,18 +768,41 @@ static Type *struct_decl(Token **rest, Token *tok) {
     mem->offset = offset;
     offset = new_binary(ND_ADD, offset, mem->ty->size, tok);
 
-    Node *cond = new_node(ND_COND, tok);
-    cond->cond = new_binary(ND_LT, ty->align, mem->ty->align, tok);
-    cond->then = mem->ty->align;
-    cond->els = ty->align;
-    ty->align = reduce(cond);
+    Node *align_cond = new_node(ND_COND, tok);
+    align_cond->cond = new_binary(ND_LT, ty->align, mem->ty->align, tok);
+    align_cond->then = mem->ty->align;
+    align_cond->els = ty->align;
+    ty->align = reduce(align_cond);
   }
   ty->size = reduce(align_to_node(offset, ty->align, tok));
+  return ty;
+}
 
-  // Register the struct type if a name was given.
-  if (tag)
-    push_tag_scope(tag, ty);
+// union-decl = struct-union-decl
+static Type *union_decl(Token **rest, Token *tok) {
+  Type *ty = struct_union_decl(rest, tok);
+  ty->kind = TY_UNION;
 
+  // We need to compute the alignment and the size though.
+  Node *zero = new_num(0, tok);
+  ty->size = zero;
+  ty->align = zero;
+  for (Member *mem = ty->members; mem; mem = mem->next) {
+    mem->offset = zero;
+
+    Node *align_cond = new_node(ND_COND, tok);
+    align_cond->cond = new_binary(ND_LT, ty->align, mem->ty->align, tok);
+    align_cond->then = mem->ty->align;
+    align_cond->els = ty->align;
+    ty->align = reduce(align_cond);
+
+    Node *size_cond = new_node(ND_COND, tok);
+    size_cond->cond = new_binary(ND_LT, ty->size, mem->ty->size, tok);
+    size_cond->then = mem->ty->size;
+    size_cond->els = ty->size;
+    ty->size = reduce(size_cond);
+  }
+  ty->size = reduce(align_to_node(ty->size, ty->align, tok));
   return ty;
 }
 
@@ -778,8 +816,8 @@ static Member *get_struct_member(Type *ty, Token *tok) {
 
 static Node *struct_ref(Node *lhs, Token *tok) {
   add_type(lhs);
-  if (lhs->ty->kind != TY_STRUCT)
-    error_tok(lhs->tok, "not a struct");
+  if (lhs->ty->kind != TY_STRUCT && lhs->ty->kind != TY_UNION)
+    error_tok(lhs->tok, "not a struct nor a union");
 
   Node *node = new_unary(ND_MEMBER, lhs, tok);
   node->member = get_struct_member(lhs->ty, tok);

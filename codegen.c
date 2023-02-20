@@ -65,6 +65,7 @@ static const char *to_typename(Type *ty) {
     case TY_INT:
       return "int32";
     case TY_STRUCT:
+    case TY_UNION:
       if (ty->tag)
         return format("%s_%p", get_string(ty->tag), ty);
       else
@@ -333,6 +334,16 @@ static void emit_struct_type(Type *ty) {
       println(".structure public %s", to_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
         println("  public %s %s", to_typename(mem->ty), get_string(mem->name));
+      }
+      // Emit member type recursively.
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        emit_struct_type(mem->ty);
+      }
+      break;
+    case TY_UNION:
+      println(".structure public %s explicit", to_typename(ty));
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        println("  public %s %s 0", to_typename(mem->ty), get_string(mem->name));
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
