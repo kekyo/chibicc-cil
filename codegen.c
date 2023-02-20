@@ -65,7 +65,10 @@ static const char *to_typename(Type *ty) {
     case TY_INT:
       return "int32";
     case TY_STRUCT:
-      return format("_S__%p", ty);
+      if (ty->tag)
+        return format("%s_%p", get_string(ty->tag), ty);
+      else
+        return format("tag_%p", ty);
   }
 
   return "BUG4";
