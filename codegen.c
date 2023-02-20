@@ -95,12 +95,21 @@ static const char *to_cil_typename(Type *ty) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
-    if (node->var->is_local)
-      // Local variable
-      println("  ldloca %d", node->var->offset);
-    else
-      // Global variable
-      println("  ldsflda %s", node->var->name);
+    switch (node->var->kind) {
+      case OB_GLOBAL:
+        // Global variable
+        println("  ldsflda %s", node->var->name);
+        return;
+      case OB_LOCAL:
+        // Local variable
+        println("  ldloca %d", node->var->offset);
+        return;
+      case OB_PARAM:
+        // Parameter variable
+        println("  ldarga %d", node->var->offset);
+        return;
+    }
+    unreachable();
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
@@ -383,7 +392,10 @@ static void emit_struct(Obj *prog) {
     if (fn->is_function) {
       aggregate_type(fn->ty->return_ty);
 
-      // Included parameter types.
+      // Included parameter/local variable types.
+      for (Obj *var = fn->params; var; var = var->next) {
+        aggregate_type(var->ty);
+      }
       for (Obj *var = fn->locals; var; var = var->next) {
         aggregate_type(var->ty);
       }
@@ -417,12 +429,17 @@ static void assign_lvar_offsets(Obj *prog) {
     if (!fn->is_function)
       continue;
 
-    int offset = 0;
-    for (Obj *var = fn->locals; var; var = var->next) {
-      var->offset = offset;
-      offset++;
+    int param_offset = 0;
+    for (Obj *var = fn->params; var; var = var->next) {
+      var->offset = param_offset;
+      param_offset++;
     }
-    fn->stack_size = offset;
+
+    int local_offset = 0;
+    for (Obj *var = fn->locals; var; var = var->next) {
+      var->offset = local_offset;
+      local_offset++;
+    }
   }
 }
 
@@ -457,14 +474,6 @@ static void emit_text(Obj *prog) {
     // Prologue
     for (Obj *var = fn->locals; var; var = var->next) {
       println("  .local %s %s", to_cil_typename(var->ty), var->name);
-    }
-
-    // Save passed-by-register arguments to the stack
-    int i = 0;
-    for (Obj *var = fn->params; var; var = var->next) {
-      println("  ldarg %d", i);
-      println("  stloc %d", var->offset);
-      i++;
     }
 
     // Emit code
