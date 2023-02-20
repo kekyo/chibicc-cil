@@ -41,9 +41,9 @@ int calculate_size(Type *ty) {
   return -1;
 }
 
-static const char *to_typename(Type *ty) {
+static const char *to_cil_typename(Type *ty) {
   if (ty->base) {
-    const char *base_name = to_typename(ty->base);
+    const char *base_name = to_cil_typename(ty->base);
     switch (ty->kind) {
       case TY_ARRAY:
         return format("%s[%d]", base_name, ty->array_len);
@@ -117,7 +117,7 @@ static void load(Type *ty) {
       return;
     case TY_STRUCT:
     case TY_UNION:
-      println("  ldobj %s", to_typename(ty));
+      println("  ldobj %s", to_cil_typename(ty));
       return;
     case TY_PTR:
       println("  ldind.i");
@@ -143,8 +143,8 @@ static void store(Type *ty) {
   switch (ty->kind) {
     case TY_STRUCT:
     case TY_UNION:
-      println("  stobj %s", to_typename(ty));
-      println("  ldobj %s", to_typename(ty));
+      println("  stobj %s", to_cil_typename(ty));
+      println("  ldobj %s", to_cil_typename(ty));
       return;
     case TY_PTR:
       println("  conv.u");
@@ -210,7 +210,7 @@ static void gen_expr(Node *node) {
           return;
         }
     }
-    println("  sizeof %s", to_typename(node->sizeof_ty));
+    println("  sizeof %s", to_cil_typename(node->sizeof_ty));
     return;
   case ND_ASSIGN:
     gen_addr(node->lhs);
@@ -350,9 +350,9 @@ static void emit_struct_type(Type *ty) {
       emit_struct_type(ty->base);
       break;
     case TY_STRUCT:
-      println(".structure public %s", to_typename(ty));
+      println(".structure public %s", to_cil_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        println("  public %s %s", to_typename(mem->ty), get_string(mem->name));
+        println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
@@ -360,9 +360,9 @@ static void emit_struct_type(Type *ty) {
       }
       break;
     case TY_UNION:
-      println(".structure public %s explicit", to_typename(ty));
+      println(".structure public %s explicit", to_cil_typename(ty));
       for (Member *mem = ty->members; mem; mem = mem->next) {
-        println("  public %s %s 0", to_typename(mem->ty), get_string(mem->name));
+        println("  public %s %s 0", to_cil_typename(mem->ty), get_string(mem->name));
       }
       // Emit member type recursively.
       for (Member *mem = ty->members; mem; mem = mem->next) {
@@ -404,7 +404,7 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    print(".global public %s %s", to_typename(var->ty), var->name);
+    print(".global public %s %s", to_cil_typename(var->ty), var->name);
 
     if (var->init_data) {
       for (int i = 0; i < var->init_data_size; i++)
@@ -422,14 +422,14 @@ static void emit_text(Obj *prog) {
 
     print(".function public int32 %s", fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
-      print(" %s:%s", var->name, to_typename(var->ty));
+      print(" %s:%s", var->name, to_cil_typename(var->ty));
     }
     println("");
     current_fn = fn;
 
     // Prologue
     for (Obj *var = fn->locals; var; var = var->next) {
-      println("  .local %s %s", to_typename(var->ty), var->name);
+      println("  .local %s %s", to_cil_typename(var->ty), var->name);
     }
 
     // Save passed-by-register arguments to the stack
