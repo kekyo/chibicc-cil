@@ -27,11 +27,9 @@ static int count(void) {
 }
 
 int calculate_size(Type *ty) {
+  if (ty->size && ty->size->kind == ND_NUM)
+    return ty->size->val;
   switch (ty->kind) {
-    case TY_CHAR:
-      return 1;
-    case TY_INT:
-      return 4;
     case TY_ARRAY: {
       int sz = calculate_size(ty->base);
       if (sz >= 0) {
@@ -39,10 +37,6 @@ int calculate_size(Type *ty) {
       }
       break;
     }
-    case TY_STRUCT:
-      if (ty->size->kind == ND_NUM)
-        return ty->size->val;
-      break;
   }
   return -1;
 }
@@ -56,7 +50,7 @@ static const char *to_typename(Type *ty) {
       case TY_PTR:
         return format("%s*", base_name);
     }
-    return "BUG3";
+    unreachable();
   }
 
   switch (ty->kind) {
@@ -71,8 +65,7 @@ static const char *to_typename(Type *ty) {
       else
         return format("tag_%p", ty);
   }
-
-  return "BUG4";
+  unreachable();
 }
 
 // Compute the absolute address of a given node.
@@ -130,9 +123,7 @@ static void load(Type *ty) {
       println("  ldind.i4");
       return;
   }
-
-  // BUG
-  println("  BUG1");
+  unreachable();
 }
 
 // Store stack top to an address that the stack top is pointing to.
@@ -157,9 +148,7 @@ static void store(Type *ty) {
       println("  ldind.i4");
       return;
   }
-
-  // BUG
-  println("  BUG2");
+  unreachable();
 }
 
 static void gen_expr(Node *node) {
