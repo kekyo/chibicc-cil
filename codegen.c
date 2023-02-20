@@ -18,6 +18,8 @@ static char *format(char *fmt, ...) {
 
 int calculate_size(Type *ty) {
   switch (ty->kind) {
+    case TY_CHAR:
+      return 1;
     case TY_INT:
       return 4;
     case TY_ARRAY: {
@@ -39,14 +41,16 @@ static const char *to_typename(Type *ty) {
       case TY_PTR:
         return format("%s*", base_name);
     }
-    return "BUG";
+    return "BUG3";
   }
 
   switch (ty->kind) {
+    case TY_CHAR:
+      return "int8";
     case TY_INT:
       return "int32";
   }
-  return "BUG";
+  return "BUG4";
 }
 
 static void gen_expr(Node *node);
@@ -76,7 +80,7 @@ static void gen_addr(Node *node) {
   error_tok(node->tok, "not an lvalue");
 }
 
-// Load a value from where %rax is pointing to.
+// Load a value from where stack top is pointing to.
 static void load(Type *ty) {
   if (ty->kind == TY_ARRAY) {
     // If it is an array, do not attempt to load a value to the
@@ -88,22 +92,41 @@ static void load(Type *ty) {
     return;
   }
 
-  if (ty->kind == TY_PTR) {
-    printf("  ldind.i\n");
-  } else {
-    printf("  ldind.i4\n");
+  switch (ty->kind) {
+    case TY_PTR:
+      printf("  ldind.i\n");
+      return;
+    case TY_CHAR:
+      printf("  ldind.i1\n");
+      return;
+    case TY_INT:
+      printf("  ldind.i4\n");
+      return;
   }
+
+  // BUG
+  printf("  BUG1\n");
 }
 
-// Store %rax to an address that the stack top is pointing to.
+// Store stack top to an address that the stack top is pointing to.
 static void store(Type *ty) {
-  if (ty->kind == TY_PTR) {
-    printf("  stind.i\n");
-    printf("  ldind.i\n");
-  } else {
-    printf("  stind.i4\n");
-    printf("  ldind.i4\n");
+  switch (ty->kind) {
+    case TY_PTR:
+      printf("  stind.i\n");
+      printf("  ldind.i\n");
+      return;
+    case TY_CHAR:
+      printf("  stind.i1\n");
+      printf("  ldind.i1\n");
+      return;
+    case TY_INT:
+      printf("  stind.i4\n");
+      printf("  ldind.i4\n");
+      return;
   }
+
+  // BUG
+  printf("  BUG2\n");
 }
 
 static void gen_expr(Node *node) {
