@@ -1,5 +1,5 @@
 #!/bin/bash
-chibias -c -o tmp2.dll test2.s
+chibias -f net45 -c -o tmp2.dll test2.s
 
 assert() {
   expected="$1"
@@ -7,7 +7,7 @@ assert() {
 
   rm -f tmp.exe
   ./chibicc "$input" > tmp.s || exit
-  chibias -r tmp2.dll -o tmp.exe tmp.s
+  chibias -f net45 -w x86 -r tmp2.dll -o tmp.exe tmp.s
   ./tmp.exe
   actual="$?"
 

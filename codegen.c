@@ -225,7 +225,7 @@ void codegen(Function *prog) {
   assign_lvar_offsets(prog);
 
   for (Function *fn = prog; fn; fn = fn->next) {
-    printf(".function int32 %s", fn->name);
+    printf(".function public int32 %s", fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
       printf(" %s:%s", var->name, to_typename(var->ty));
     }
