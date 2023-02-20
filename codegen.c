@@ -1,7 +1,6 @@
 #include "chibicc.h"
 
-static Function *current_prog;
-static Function *current_fn;
+static Obj *current_fn;
 
 // Takes a printf-style format string and returns a formatted string.
 static char *format(char *fmt, ...) {
@@ -233,8 +232,11 @@ static void gen_stmt(Node *node) {
 }
 
 // Assign offsets to local variables.
-static void assign_lvar_offsets(Function *prog) {
-  for (Function *fn = prog; fn; fn = fn->next) {
+static void assign_lvar_offsets(Obj *prog) {
+  for (Obj *fn = prog; fn; fn = fn->next) {
+    if (!fn->is_function)
+      continue;
+
     int offset = 0;
     for (Obj *var = fn->locals; var; var = var->next) {
       var->offset = offset;
@@ -244,12 +246,13 @@ static void assign_lvar_offsets(Function *prog) {
   }
 }
 
-void codegen(Function *prog) {
-  current_prog = prog;
-
+void codegen(Obj *prog) {
   assign_lvar_offsets(prog);
 
-  for (Function *fn = prog; fn; fn = fn->next) {
+  for (Obj *fn = prog; fn; fn = fn->next) {
+    if (!fn->is_function)
+      continue;
+
     printf(".function public int32 %s", fn->name);
     for (Obj *var = fn->params; var; var = var->next) {
       printf(" %s:%s", var->name, to_typename(var->ty));
