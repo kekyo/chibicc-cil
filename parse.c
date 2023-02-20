@@ -238,7 +238,7 @@ static Type *type_suffix(Token **rest, Token *tok, Type *ty) {
 // declarator = "*"* ident type-suffix
 static Type *declarator(Token **rest, Token *tok, Type *ty) {
   while (consume(&tok, tok, "*"))
-    ty = pointer_to(ty);
+    ty = pointer_to(ty, tok);
 
   if (tok->kind != TK_IDENT)
     error_tok(tok, "expected a variable name");
@@ -666,9 +666,30 @@ static Node *reduce(Node *node) {
       return new_num(lhs->val <= rhs->val ? 1 : 0, node->tok);
     else
       return new_binary(ND_LE, lhs, rhs, node->tok);
+  case ND_COND:
+    cond = reduce(node->cond);
+    if (cond->kind == ND_NUM)
+      return cond->val ? reduce(node->then) : reduce(node->els);
+    else {
+      Node *ncond = new_node(node->kind, node->tok);
+      ncond->cond = cond;
+      ncond->then = reduce(node->then);
+      ncond->els = reduce(node->els);
+      return ncond;
+    }
   }
 
   return node;
+}
+
+static Node *align_to_node(Node *n, Node *align, Token *tok) {
+  // (n + align - 1) / align * align;
+  Node *next = new_binary(
+    ND_SUB, new_binary(ND_ADD, n, align, tok), new_num(1, tok), tok);
+  Node *based = new_binary(
+    ND_DIV, next, align, tok);
+  return new_binary(
+    ND_MUL, based, align, tok);
 }
 
 // struct-decl = "{" struct-members
@@ -679,14 +700,22 @@ static Type *struct_decl(Token **rest, Token *tok) {
   Type *ty = calloc(1, sizeof(Type));
   ty->kind = TY_STRUCT;
   struct_members(rest, tok, ty);
+  ty->align = new_num(1, tok);
 
   // Assign offsets within the struct to members.
   Node *offset = new_num(0, tok);
   for (Member *mem = ty->members; mem; mem = mem->next) {
+    offset = reduce(align_to_node(offset, mem->ty->align, tok));
     mem->offset = offset;
-    offset = reduce(new_binary(ND_ADD, offset, mem->ty->size, tok));
+    offset = new_binary(ND_ADD, offset, mem->ty->size, tok);
+
+    Node *cond = new_node(ND_COND, tok);
+    cond->cond = new_binary(ND_LT, ty->align, mem->ty->align, tok);
+    cond->then = mem->ty->align;
+    cond->els = ty->align;
+    ty->align = reduce(cond);
   }
-  ty->size = offset;
+  ty->size = reduce(align_to_node(offset, ty->align, tok));
 
   return ty;
 }

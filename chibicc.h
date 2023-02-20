@@ -166,6 +166,7 @@ typedef enum {
 struct Type {
   TypeKind kind;
   Node *size;      // sizeof() value
+  Node *align;     // alignment
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -205,7 +206,7 @@ extern Type *ty_int;
 
 bool is_integer(Type *ty);
 Type *copy_type(Type *ty);
-Type *pointer_to(Type *base);
+Type *pointer_to(Type *base, Token *tok);
 Type *func_type(Type *return_ty);
 Type *array_of(Type *base, int size);
 void add_type(Node *node);

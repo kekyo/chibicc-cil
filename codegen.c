@@ -37,7 +37,12 @@ int calculate_size(Type *ty) {
       if (sz >= 0) {
         return sz * ty->array_len;
       }
+      break;
     }
+    case TY_STRUCT:
+      if (ty->size->kind == ND_NUM)
+        return ty->size->val;
+      break;
   }
   return -1;
 }
