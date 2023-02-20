@@ -1,5 +1,6 @@
 #include "chibicc.h"
 
+static FILE *output_file;
 static Obj *current_fn;
 
 int calculate_size(Type *ty) {
@@ -45,15 +46,15 @@ static void gen_stmt(Node *node);
 static void println(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  vprintf(fmt, ap);
+  vfprintf(output_file, fmt, ap);
   va_end(ap);
-  printf("\n");
+  fprintf(output_file, "\n");
 }
 
 static void print(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  vprintf(fmt, ap);
+  vfprintf(output_file, fmt, ap);
   va_end(ap);
 }
 
@@ -335,7 +336,9 @@ static void emit_text(Obj *prog) {
   }
 }
 
-void codegen(Obj *prog) {
+void codegen(Obj *prog, FILE *out) {
+  output_file = out;
+  
   assign_lvar_offsets(prog);
   emit_data(prog);
   emit_text(prog);

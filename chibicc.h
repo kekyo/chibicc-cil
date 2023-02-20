@@ -192,4 +192,4 @@ void add_type(Node *node);
 //
 
 int calculate_size(Type *ty);
-void codegen(Obj *prog);
+void codegen(Obj *prog, FILE *out);
