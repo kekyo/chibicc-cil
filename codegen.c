@@ -150,9 +150,9 @@ static void gen_expr(Node *node) {
   if (node->tok)
     println("  .location 1 %d %d %d %d",
       node->tok->line_no - 1,
-      node->tok->start_column_no - 1,
+      node->tok->column_no - 1,
       node->tok->line_no - 1,
-      node->tok->end_column_no - 1);
+      node->tok->column_no + node->tok->len - 1);
 
   switch (node->kind) {
   case ND_NUM:
@@ -251,9 +251,9 @@ static void gen_stmt(Node *node) {
   if (node->tok)
     println("  .location 1 %d %d %d %d",
       node->tok->line_no - 1,
-      node->tok->start_column_no - 1,
+      node->tok->column_no - 1,
       node->tok->line_no - 1,
-      node->tok->end_column_no - 1);
+      node->tok->column_no + node->tok->len - 1);
 
   switch (node->kind) {
   case ND_IF: {

@@ -232,32 +232,19 @@ static void convert_keywords(Token *tok) {
 static void add_line_numbers(Token *tok) {
   char *p = current_input;
   char *start = p;
-  Token *last_tok = NULL;
   int n = 1;
 
   do {
     if (p == tok->loc) {
       tok->line_no = n;
-      tok->start_column_no = p - start + 1;
-
-      if (last_tok)
-        last_tok->end_column_no = p - start + 1;
-      last_tok = tok;
-
+      tok->column_no = p - start + 1;
       tok = tok->next;
     }
     if (*p == '\n') {
-      if (last_tok)
-        last_tok->end_column_no = p - start + 1;
-      last_tok = NULL;
-
       start = p + 1;
       n++;
     }
   } while (*p++);
-
-  if (last_tok)
-    last_tok->end_column_no = p - start + 1;
 }
 
 // Tokenize a given string and returns new tokens.
