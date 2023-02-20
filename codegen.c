@@ -115,6 +115,7 @@ static void load(Type *ty) {
 static void store(Type *ty) {
   switch (ty->kind) {
     case TY_PTR:
+      println("  conv.u");
       println("  stind.i");
       println("  ldind.i");
       return;
