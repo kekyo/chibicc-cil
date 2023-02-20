@@ -208,10 +208,10 @@ static int getTypeId(Type *ty) {
     return I32;
   case TY_LONG:
     return I64;
-  case TY_PTR:
-    return IPTR;
   }
-  unreachable();
+
+  // Will ignore conversion when both nodes are same with TY_STRUCT and another types.
+  return IPTR;
 }
 
 // The table for type casts

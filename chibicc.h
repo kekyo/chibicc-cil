@@ -159,6 +159,7 @@ struct Node {
 };
 
 Node *new_sizeof(Type *ty, Token *tok);
+Node *new_cast(Node *expr, Type *ty);
 Obj *parse(Token *tok);
 
 //
