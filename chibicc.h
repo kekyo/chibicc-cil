@@ -10,6 +10,7 @@
 
 typedef struct Type Type;
 typedef struct Node Node;
+typedef struct Member Member;
 
 //
 // strings.c
@@ -50,6 +51,7 @@ struct Token {
 void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+char *get_string(Token *tok);
 bool equal(Token *tok, char *op);
 Token *skip(Token *tok, char *op);
 bool consume(Token **rest, Token *tok, char *str);
@@ -97,6 +99,7 @@ typedef enum {
   ND_LE,        // <=
   ND_ASSIGN,    // =
   ND_COMMA,     // ,
+  ND_MEMBER,    // . (struct member access)
   ND_ADDR,      // unary &
   ND_DEREF,     // unary *
   ND_SIZEOF,    // sizeof
@@ -132,6 +135,9 @@ struct Node {
   // Block or statement expression
   Node *body;
 
+  // Struct member access
+  Member *member;
+
   // Function call
   char *funcname;
   Node *args;
@@ -154,6 +160,7 @@ typedef enum {
   TY_PTR,
   TY_FUNC,
   TY_ARRAY,
+  TY_STRUCT,
 } TypeKind;
 
 struct Type {
@@ -176,10 +183,21 @@ struct Type {
   // Array
   int array_len;
 
+  // Struct
+  Member *members;
+
   // Function type
   Type *return_ty;
   Type *params;
   Type *next;
+};
+
+// Struct member
+struct Member {
+  Member *next;
+  Type *ty;
+  Token *name;
+  Node *offset;
 };
 
 extern Type *ty_char;

@@ -59,7 +59,10 @@ static const char *to_typename(Type *ty) {
       return "int8";
     case TY_INT:
       return "int32";
+    case TY_STRUCT:
+      return format("_S__%p", ty);
   }
+
   return "BUG4";
 }
 
@@ -82,6 +85,11 @@ static void gen_addr(Node *node) {
     gen_expr(node->lhs);
     println("  pop");
     gen_addr(node->rhs);
+    return;
+  case ND_MEMBER:
+    gen_addr(node->lhs);
+    gen_expr(node->member->offset);
+    println("  add");
     return;
   }
 
@@ -155,6 +163,7 @@ static void gen_expr(Node *node) {
     println("  neg");
     return;
   case ND_VAR:
+  case ND_MEMBER:
     gen_addr(node);
     load(node->ty);
     return;
@@ -294,6 +303,37 @@ static void gen_stmt(Node *node) {
   error_tok(node->tok, "invalid statement");
 }
 
+static void emit_struct_type(Type *ty) {
+  switch (ty->kind) {
+    case TY_PTR:
+    case TY_ARRAY:
+      emit_struct_type(ty->base);
+      break;
+    case TY_STRUCT:
+      println(".structure public %s", to_typename(ty));
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        println("  public %s %s", to_typename(mem->ty), get_string(mem->name));
+      }
+      // Emit member type recursively.
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        emit_struct_type(mem->ty);
+      }
+      break;
+  }
+}
+
+static void emit_struct(Obj *prog) {
+  for (Obj *fn = prog; fn; fn = fn->next) {
+    if (!fn->is_function)
+      continue;
+
+    // Included parameter types.
+    for (Obj *var = fn->locals; var; var = var->next) {
+      emit_struct_type(var->ty);
+    }
+  }
+}
+
 // Assign offsets to local variables.
 static void assign_lvar_offsets(Obj *prog) {
   for (Obj *fn = prog; fn; fn = fn->next) {
@@ -321,13 +361,11 @@ static void emit_data(Obj *prog) {
         print(" 0x%hhx", var->init_data[i]);
     }
 
-    println("\n");
+    println("");
   }
 }
 
 static void emit_text(Obj *prog) {
-  assign_lvar_offsets(prog);
-
   for (Obj *fn = prog; fn; fn = fn->next) {
     if (!fn->is_function)
       continue;
@@ -341,7 +379,7 @@ static void emit_text(Obj *prog) {
 
     // Prologue
     for (Obj *var = fn->locals; var; var = var->next) {
-      println("  .local %s %s\n", to_typename(var->ty), var->name);
+      println("  .local %s %s", to_typename(var->ty), var->name);
     }
 
     // Save passed-by-register arguments to the stack
@@ -365,6 +403,7 @@ void codegen(Obj *prog, FILE *out) {
   output_file = out;
   
   assign_lvar_offsets(prog);
+  emit_struct(prog);
   emit_data(prog);
   emit_text(prog);
 }

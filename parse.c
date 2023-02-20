@@ -52,6 +52,7 @@ static Node *equality(Token **rest, Token *tok);
 static Node *relational(Token **rest, Token *tok);
 static Node *add(Token **rest, Token *tok);
 static Node *mul(Token **rest, Token *tok);
+static Type *struct_decl(Token **rest, Token *tok);
 static Node *postfix(Token **rest, Token *tok);
 static Node *unary(Token **rest, Token *tok);
 static Node *primary(Token **rest, Token *tok);
@@ -178,15 +179,22 @@ static int get_number(Token *tok) {
   return tok->val;
 }
 
-// declspec = "char" | "int"
+// declspec = "char" | "int" | struct-decl
 static Type *declspec(Token **rest, Token *tok) {
   if (equal(tok, "char")) {
     *rest = tok->next;
     return ty_char;
   }
 
-  *rest = skip(tok, "int");
-  return ty_int;
+  if (equal(tok, "int")) {
+    *rest = tok->next;
+    return ty_int;
+  }
+
+  if (equal(tok, "struct"))
+    return struct_decl(rest, tok->next);
+
+  error_tok(tok, "typename expected");
 }
 
 // func-params = (param ("," param)*)? ")"
@@ -271,7 +279,7 @@ static Node *declaration(Token **rest, Token *tok) {
 
 // Returns true if a given token represents a type.
 static bool is_typename(Token *tok) {
-  return equal(tok, "char") || equal(tok, "int");
+  return equal(tok, "char") || equal(tok, "int") || equal(tok, "struct");
 }
 
 // stmt = "return" expr ";"
@@ -564,19 +572,166 @@ static Node *unary(Token **rest, Token *tok) {
   return postfix(rest, tok);
 }
 
-// postfix = primary ("[" expr "]")*
+// struct-members = (declspec declarator (","  declarator)* ";")*
+static void struct_members(Token **rest, Token *tok, Type *ty) {
+  Member head = {};
+  Member *cur = &head;
+
+  while (!equal(tok, "}")) {
+    Type *basety = declspec(&tok, tok);
+    int i = 0;
+
+    while (!consume(&tok, tok, ";")) {
+      if (i++)
+        tok = skip(tok, ",");
+
+      Member *mem = calloc(1, sizeof(Member));
+      mem->ty = declarator(&tok, tok, basety);
+      mem->name = mem->ty->name;
+      cur = cur->next = mem;
+    }
+  }
+
+  *rest = tok->next;
+  ty->members = head.next;
+}
+
+// Evaluate a given node as a constant expression.
+static Node *reduce(Node *node) {
+  add_type(node);
+
+  Node *lhs;
+  Node *rhs;
+  Node *cond;
+  switch (node->kind) {
+  case ND_ADD:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val + rhs->val, node->tok);
+    else
+      return new_binary(ND_ADD, lhs, rhs, node->tok);
+  case ND_SUB:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val - rhs->val, node->tok);
+    else
+      return new_binary(ND_SUB, lhs, rhs, node->tok);
+  case ND_MUL:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val * rhs->val, node->tok);
+    else
+      return new_binary(ND_MUL, lhs, rhs, node->tok);
+  case ND_DIV:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val / rhs->val, node->tok);
+    else
+      return new_binary(ND_DIV, lhs, rhs, node->tok);
+  case ND_NEG:
+    lhs = reduce(node->lhs);
+    if (lhs->kind == ND_NUM)
+      return new_num(-lhs->val, node->tok);
+    else
+      return new_unary(ND_NEG, lhs, node->tok);
+  case ND_EQ:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val == rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_EQ, lhs, rhs, node->tok);
+  case ND_NE:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val != rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_NE, lhs, rhs, node->tok);
+  case ND_LT:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val < rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_LT, lhs, rhs, node->tok);
+  case ND_LE:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
+      return new_num(lhs->val <= rhs->val ? 1 : 0, node->tok);
+    else
+      return new_binary(ND_LE, lhs, rhs, node->tok);
+  }
+
+  return node;
+}
+
+// struct-decl = "{" struct-members
+static Type *struct_decl(Token **rest, Token *tok) {
+  tok = skip(tok, "{");
+
+  // Construct a struct object.
+  Type *ty = calloc(1, sizeof(Type));
+  ty->kind = TY_STRUCT;
+  struct_members(rest, tok, ty);
+
+  // Assign offsets within the struct to members.
+  Node *offset = new_num(0, tok);
+  for (Member *mem = ty->members; mem; mem = mem->next) {
+    mem->offset = offset;
+    offset = reduce(new_binary(ND_ADD, offset, mem->ty->size, tok));
+  }
+  ty->size = offset;
+
+  return ty;
+}
+
+static Member *get_struct_member(Type *ty, Token *tok) {
+  for (Member *mem = ty->members; mem; mem = mem->next)
+    if (mem->name->len == tok->len &&
+        !strncmp(mem->name->loc, tok->loc, tok->len))
+      return mem;
+  error_tok(tok, "no such member");
+}
+
+static Node *struct_ref(Node *lhs, Token *tok) {
+  add_type(lhs);
+  if (lhs->ty->kind != TY_STRUCT)
+    error_tok(lhs->tok, "not a struct");
+
+  Node *node = new_unary(ND_MEMBER, lhs, tok);
+  node->member = get_struct_member(lhs->ty, tok);
+  return node;
+}
+
+// postfix = primary ("[" expr "]" | "." ident)*
 static Node *postfix(Token **rest, Token *tok) {
   Node *node = primary(&tok, tok);
 
-  while (equal(tok, "[")) {
-    // x[y] is short for *(x+y)
-    Token *start = tok;
-    Node *idx = expr(&tok, tok->next);
-    tok = skip(tok, "]");
-    node = new_unary(ND_DEREF, new_add(node, idx, start), start);
+  for (;;) {
+    if (equal(tok, "[")) {
+      // x[y] is short for *(x+y)
+      Token *start = tok;
+      Node *idx = expr(&tok, tok->next);
+      tok = skip(tok, "]");
+      node = new_unary(ND_DEREF, new_add(node, idx, start), start);
+      continue;
+    }
+
+    if (equal(tok, ".")) {
+      node = struct_ref(node, tok->next);
+      tok = tok->next->next;
+      continue;
+    }
+
+    *rest = tok;
+    return node;
   }
-  *rest = tok;
-  return node;
 }
 
 // funcall = ident "(" (assign ("," assign)*)? ")"
