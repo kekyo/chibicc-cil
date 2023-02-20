@@ -61,7 +61,12 @@ static int count(void) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
-    printf("  ldloca %d\n", node->var->offset);
+    if (node->var->is_local)
+      // Local variable
+      printf("  ldloca %d\n", node->var->offset);
+    else
+      // Global variable
+      printf("  ldsflda %s\n", node->var->name);
     return;
   case ND_DEREF:
     gen_expr(node->lhs);
@@ -246,7 +251,16 @@ static void assign_lvar_offsets(Obj *prog) {
   }
 }
 
-void codegen(Obj *prog) {
+static void emit_data(Obj *prog) {
+  for (Obj *var = prog; var; var = var->next) {
+    if (var->is_function)
+      continue;
+
+    printf(".global public %s %s\n", to_typename(var->ty), var->name);
+  }
+}
+
+static void emit_text(Obj *prog) {
   assign_lvar_offsets(prog);
 
   for (Obj *fn = prog; fn; fn = fn->next) {
@@ -275,4 +289,10 @@ void codegen(Obj *prog) {
     printf("_L_return:\n");
     printf("  ret\n");
   }
+}
+
+void codegen(Obj *prog) {
+  assign_lvar_offsets(prog);
+  emit_data(prog);
+  emit_text(prog);
 }
