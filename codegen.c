@@ -3,6 +3,20 @@
 static Function *current_prog;
 static Function *current_fn;
 
+int calculate_size(Type *ty) {
+  switch (ty->kind) {
+    case TY_INT:
+      return 4;
+    case TY_ARRAY: {
+      int sz = calculate_size(ty->base);
+      if (sz >= 0) {
+        return sz * ty->array_len;
+      }
+    }
+  }
+  return -1;
+}
+
 static const char *to_typename0(Type *ty, int is_array_ptr) {
   if (ty->base) {
     const char *base_name = to_typename0(ty->base, is_array_ptr);
@@ -106,6 +120,16 @@ static void gen_expr(Node *node) {
     return;
   case ND_ADDR:
     gen_addr(node->lhs);
+    return;
+  case ND_SIZEOF:
+    switch (node->ty->kind) {
+      case TY_ARRAY:
+        if (node->ty->array_len == 0) {
+          printf("  ldc.i4.0\n");
+          return;
+        }
+    }
+    printf("  sizeof %s\n", to_typename(node->sizeof_ty));
     return;
   case ND_ASSIGN:
     gen_addr(node->lhs);

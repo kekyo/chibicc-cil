@@ -71,6 +71,17 @@ static Node *new_num(int val, Token *tok) {
   return node;
 }
 
+Node *new_sizeof(Type *ty, Token *tok) {
+  int size = calculate_size(ty);
+  if (size >= 0)
+    return new_num(size, tok);
+
+  Node *node = new_node(ND_SIZEOF, tok);
+  node->sizeof_ty = ty;
+  node->ty = ty_int;  // TODO: Will adjust to size_t.
+  return node;
+}
+
 static Node *new_var_node(Obj *var, Token *tok) {
   Node *node = new_node(ND_VAR, tok);
   node->var = var;
@@ -368,7 +379,7 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   }
 
   // ptr + num
-  rhs = new_binary(ND_MUL, rhs, new_num(lhs->ty->base->size, tok), tok);
+  rhs = new_binary(ND_MUL, rhs, lhs->ty->base->size, tok);
   return new_binary(ND_ADD, lhs, rhs, tok);
 }
 
@@ -383,7 +394,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
 
   // ptr - num
   if (lhs->ty->base && is_integer(rhs->ty)) {
-    rhs = new_binary(ND_MUL, rhs, new_num(lhs->ty->base->size, tok), tok);
+    rhs = new_binary(ND_MUL, rhs, lhs->ty->base->size, tok);
     add_type(rhs);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node->ty = lhs->ty;
@@ -394,7 +405,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
   if (lhs->ty->base && rhs->ty->base) {
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node->ty = ty_int;
-    return new_binary(ND_DIV, node, new_num(lhs->ty->base->size, tok), tok);
+    return new_binary(ND_DIV, node, lhs->ty->base->size, tok);
   }
 
   error_tok(tok, "invalid operands");

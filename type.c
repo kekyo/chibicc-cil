@@ -1,6 +1,6 @@
 #include "chibicc.h"
 
-Type *ty_int = &(Type){TY_INT, 4};
+Type *ty_int = &(Type){TY_INT, &(Node){ND_NUM, 4}};
 
 bool is_integer(Type *ty) {
   return ty->kind == TY_INT;
@@ -15,8 +15,8 @@ Type *copy_type(Type *ty) {
 Type *pointer_to(Type *base) {
   Type *ty = calloc(1, sizeof(Type));
   ty->kind = TY_PTR;
-  ty->size = 4;
   ty->base = base;
+  ty->size = new_sizeof(ty, NULL);
   return ty;
 }
 
@@ -30,9 +30,9 @@ Type *func_type(Type *return_ty) {
 Type *array_of(Type *base, int len) {
   Type *ty = calloc(1, sizeof(Type));
   ty->kind = TY_ARRAY;
-  ty->size = base->size * len;
   ty->base = base;
   ty->array_len = len;
+  ty->size = new_sizeof(ty, NULL);
   return ty;
 }
 

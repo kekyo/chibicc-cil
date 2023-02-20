@@ -80,6 +80,7 @@ typedef enum {
   ND_ASSIGN,    // =
   ND_ADDR,      // unary &
   ND_DEREF,     // unary *
+  ND_SIZEOF,    // sizeof
   ND_RETURN,    // "return"
   ND_IF,        // "if"
   ND_FOR,       // "for" or "while"
@@ -93,6 +94,7 @@ typedef enum {
 // AST node type
 struct Node {
   NodeKind kind; // Node kind
+  int val;       // Used if kind == ND_NUM
   Node *next;    // Next node
   Type *ty;      // Type, e.g. int or pointer to int
   Token *tok;    // Representative token
@@ -115,9 +117,11 @@ struct Node {
   Node *args;
 
   Obj *var;      // Used if kind == ND_VAR
-  int val;       // Used if kind == ND_NUM
+
+  Type *sizeof_ty;
 };
 
+Node *new_sizeof(Type *ty, Token *tok);
 Function *parse(Token *tok);
 
 //
@@ -133,7 +137,7 @@ typedef enum {
 
 struct Type {
   TypeKind kind;
-  int size;      // sizeof() value
+  Node *size;      // sizeof() value
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -170,4 +174,5 @@ void add_type(Node *node);
 // codegen.c
 //
 
+int calculate_size(Type *ty);
 void codegen(Function *prog);
