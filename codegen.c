@@ -279,7 +279,14 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    printf(".global public %s %s\n", to_typename(var->ty), var->name);
+    printf(".global public %s %s", to_typename(var->ty), var->name);
+
+    if (var->init_data) {
+      for (int i = 0; i < var->init_data_size; i++)
+        printf(" 0x%hhx", var->init_data[i]);
+    }
+
+    printf("\n");
   }
 }
 
