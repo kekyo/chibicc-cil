@@ -5,6 +5,7 @@
 **/a.out
 /tmp*
 /chibicc
+/test/*.exe
 **/.vs/*
 **/.vscode/*
 **/.idea/*
