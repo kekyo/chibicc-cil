@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +38,7 @@ typedef struct Token Token;
 struct Token {
   TokenKind kind; // Token kind
   Token *next;    // Next token
-  int val;        // If kind is TK_NUM, its value
+  int64_t val;    // If kind is TK_NUM, its value
   char *loc;      // Token location
   int len;        // Token length
   Type *ty;       // Used if TK_STR
@@ -120,7 +121,7 @@ typedef enum {
 // AST node type
 struct Node {
   NodeKind kind; // Node kind
-  int val;       // Used if kind == ND_NUM
+  int64_t val;   // Used if kind == ND_NUM
   Node *next;    // Next node
   Type *ty;      // Type, e.g. int or pointer to int
   Token *tok;    // Representative token
@@ -160,6 +161,7 @@ Obj *parse(Token *tok);
 typedef enum {
   TY_CHAR,
   TY_INT,
+  TY_LONG,
   TY_PTR,
   TY_FUNC,
   TY_ARRAY,
@@ -208,6 +210,7 @@ struct Member {
 
 extern Type *ty_char;
 extern Type *ty_int;
+extern Type *ty_long;
 
 bool is_integer(Type *ty);
 Type *copy_type(Type *ty);

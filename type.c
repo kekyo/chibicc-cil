@@ -2,6 +2,7 @@
 
 Type *ty_char = &(Type){TY_CHAR, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
 Type *ty_int = &(Type){TY_INT, &(Node){ND_NUM, 4}, &(Node){ND_NUM, 4}};
+Type *ty_long = &(Type){TY_LONG, &(Node){ND_NUM, 8}, &(Node){ND_NUM, 8}};
 
 static Type *new_type(TypeKind kind) {
   Type *ty = calloc(1, sizeof(Type));
@@ -10,7 +11,8 @@ static Type *new_type(TypeKind kind) {
 }
 
 bool is_integer(Type *ty) {
-  return ty->kind == TY_CHAR || ty->kind == TY_INT;
+  TypeKind k = ty->kind;
+  return k == TY_CHAR || k == TY_INT || k == TY_LONG;
 }
 
 Type *copy_type(Type *ty) {

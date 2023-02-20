@@ -58,6 +58,8 @@ static const char *to_typename(Type *ty) {
       return "int8";
     case TY_INT:
       return "int32";
+    case TY_LONG:
+      return "int64";
     case TY_STRUCT:
     case TY_UNION:
       if (ty->tag)
@@ -122,6 +124,9 @@ static void load(Type *ty) {
     case TY_INT:
       println("  ldind.i4");
       return;
+    case TY_LONG:
+      println("  ldind.i8");
+      return;
   }
   unreachable();
 }
@@ -147,6 +152,10 @@ static void store(Type *ty) {
       println("  stind.i4");
       println("  ldind.i4");
       return;
+    case TY_LONG:
+      println("  stind.i8");
+      println("  ldind.i8");
+      return;
   }
   unreachable();
 }
@@ -161,7 +170,10 @@ static void gen_expr(Node *node) {
 
   switch (node->kind) {
   case ND_NUM:
-    println("  ldc.i4 %d", node->val);
+    if (node->ty->kind == TY_LONG)
+      println("  ldc.i8 %ld", node->val);
+    else
+      println("  ldc.i4 %ld", node->val);
     return;
   case ND_NEG:
     gen_expr(node->lhs);
