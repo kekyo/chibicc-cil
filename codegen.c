@@ -72,6 +72,8 @@ static const char *to_cil_typename(Type *ty) {
   switch (ty->kind) {
     case TY_VOID:
       return "void";
+    case TY_BOOL:
+      return "bool";
     case TY_CHAR:
       return "int8";
     case TY_SHORT:
@@ -147,6 +149,9 @@ static void load(Type *ty) {
     case TY_PTR:
       println("  ldind.i");
       return;
+    case TY_BOOL:
+      println("  ldind.u1");
+      return;
     case TY_CHAR:
       println("  ldind.i1");
       return;
@@ -176,6 +181,10 @@ static void store(Type *ty) {
       println("  stind.i");
       println("  ldind.i");
       return;
+    case TY_BOOL:
+      println("  stind.i1");
+      println("  ldind.u1");
+      return;
     case TY_CHAR:
       println("  stind.i1");
       println("  ldind.i1");
@@ -200,6 +209,7 @@ enum { I8, I16, I32, I64, IPTR };
 
 static int getTypeId(Type *ty) {
   switch (ty->kind) {
+  case TY_BOOL:
   case TY_CHAR:
     return I8;
   case TY_SHORT:
@@ -236,6 +246,14 @@ static void cast(Type *from, Type *to) {
     return;
   if (to->kind == TY_VOID)
     return;
+
+  if (to->kind == TY_BOOL) {
+    println("  ldc.i4.0");
+    println("  ceq");
+    println("  ldc.i4.0");
+    println("  ceq");
+    return;
+  }
 
   int t1 = getTypeId(from);
   int t2 = getTypeId(to);
