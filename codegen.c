@@ -92,7 +92,10 @@ static const char *to_cil_typename(Type *ty) {
     case TY_LONG:
       return "int64";
     case TY_ARRAY:
-      return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
+      if (ty->array_len >= 1)
+        return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
+      else
+        return format("%s[0]", to_cil_typename(ty->base));
     case TY_PTR:
       return format("%s*", to_cil_typename(ty->base));
     case TY_ENUM:
