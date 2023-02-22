@@ -122,6 +122,8 @@ typedef enum {
   ND_SIZEOF,    // sizeof
   ND_NOT,       // !
   ND_BITNOT,    // ~
+  ND_LOGAND,    // &&
+  ND_LOGOR,     // ||
   ND_RETURN,    // "return"
   ND_IF,        // "if"
   ND_FOR,       // "for" or "while"

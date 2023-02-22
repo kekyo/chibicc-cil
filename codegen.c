@@ -367,6 +367,44 @@ static void gen_expr(Node *node) {
     gen_expr(node->lhs);
     println("  not");
     return;
+  case ND_LOGAND: {
+    int c = count();
+    gen_expr(node->lhs);
+    println("  ldc.i4.0");
+    if (node->lhs->ty->kind == TY_LONG)
+      println("  conv.i8");
+    println("  beq.s _L_false_%d", c);
+    gen_expr(node->rhs);
+    println("  ldc.i4.0");
+    if (node->rhs->ty->kind == TY_LONG)
+      println("  conv.i8");
+    println("  beq.s _L_false_%d", c);
+    println("  ldc.i4.1");
+    println("  br.s _L_end_%d", c);
+    println("_L_false_%d:", c);
+    println("  ldc.i4.0");
+    println("_L_end_%d:", c);
+    return;
+  }
+  case ND_LOGOR: {
+    int c = count();
+    gen_expr(node->lhs);
+    println("  ldc.i4.0");
+    if (node->lhs->ty->kind == TY_LONG)
+      println("  conv.i8");
+    println("  bne.un.s _L_true_%d", c);
+    gen_expr(node->rhs);
+    println("  ldc.i4.0");
+    if (node->rhs->ty->kind == TY_LONG)
+      println("  conv.i8");
+    println("  bne.un.s _L_true_%d", c);
+    println("  ldc.i4.0");
+    println("  br.s _L_end_%d", c);
+    println("_L_true_%d:", c);
+    println("  ldc.i4.1");
+    println("_L_end_%d:", c);
+    return;
+  }
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
