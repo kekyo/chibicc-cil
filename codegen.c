@@ -376,6 +376,8 @@ static void gen_expr(Node *node, bool will_discard) {
     int c = count();
     gen_expr(node->cond, false);
     println("  ldc.i4.0");
+    if (node->cond->ty->kind == TY_LONG)
+      println("  conv.i8");
     println("  beq _L_else_%d", c);
     gen_expr(node->then, will_discard);
     println("  br _L_end_%d", c);
@@ -388,9 +390,8 @@ static void gen_expr(Node *node, bool will_discard) {
     gen_expr(node->lhs, will_discard);
     if (!will_discard) {
       println("  ldc.i4.0");
-      if (node->lhs->ty->kind == TY_LONG) {
+      if (node->lhs->ty->kind == TY_LONG)
         println("  conv.i8");
-      }
       println("  ceq");
     }
     return;
