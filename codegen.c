@@ -355,6 +355,14 @@ static void gen_expr(Node *node) {
     println("_L_end_%d:", c);
     return;
   }
+  case ND_NOT:
+    gen_expr(node->lhs);
+    println("  ldc.i4.0");
+    if (node->lhs->ty->kind == TY_LONG) {
+      println("  conv.i8");
+    }
+    println("  ceq");
+    return;
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next) {
       gen_expr(arg);
