@@ -17,7 +17,7 @@ static Type *new_type(TypeKind kind) {
 bool is_integer(Type *ty) {
   TypeKind k = ty->kind;
   return k == TY_BOOL || k == TY_CHAR || k == TY_SHORT ||
-         k == TY_INT  || k == TY_LONG;
+         k == TY_INT  || k == TY_LONG || k == TY_ENUM;
 }
 
 Type *copy_type(Type *ty) {
@@ -48,6 +48,13 @@ Type *array_of(Type *base, int len) {
   ty->array_len = len;
   ty->align = base->align;
   ty->size = new_sizeof(ty, NULL);
+  return ty;
+}
+
+Type *enum_type(void) {
+  Type *ty = new_type(TY_ENUM);
+  ty->align = ty_int->align;
+  ty->size = ty_int->size;
   return ty;
 }
 

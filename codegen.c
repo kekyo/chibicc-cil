@@ -79,6 +79,7 @@ static const char *to_cil_typename(Type *ty) {
     case TY_SHORT:
       return "int16";
     case TY_INT:
+    case TY_ENUM:  // TODO:
       return "int32";
     case TY_LONG:
       return "int64";
@@ -158,6 +159,7 @@ static void load(Type *ty) {
     case TY_SHORT:
       println("  ldind.i2");
       return;
+    case TY_ENUM:
     case TY_INT:
       println("  ldind.i4");
       return;
@@ -193,6 +195,7 @@ static void store(Type *ty) {
       println("  stind.i2");
       println("  ldind.i2");
       return;
+    case TY_ENUM:
     case TY_INT:
       println("  stind.i4");
       println("  ldind.i4");
@@ -214,6 +217,7 @@ static int getTypeId(Type *ty) {
     return I8;
   case TY_SHORT:
     return I16;
+  case TY_ENUM:
   case TY_INT:
     return I32;
   case TY_LONG:
