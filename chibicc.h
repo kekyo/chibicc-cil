@@ -94,6 +94,7 @@ struct Obj {
   // Global variable
   char *init_data;
   int init_data_size;
+  Node *init_expr;
 
   // Function
   Obj *params;

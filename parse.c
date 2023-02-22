@@ -116,10 +116,12 @@ static Node *declaration(Token **rest, Token *tok, Type *basety);
 static void initializer2(Token **rest, Token *tok, Initializer *init);
 static Initializer *initializer(Token **rest, Token *tok, Type *ty, Type **new_ty);
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var);
+static void gvar_initializer(Token **rest, Token *tok, Obj *var);
 static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
 static Node *expr_stmt(Token **rest, Token *tok);
 static Node *expr(Token **rest, Token *tok);
+static int64_t eval(Node *node);
 static Node *assign(Token **rest, Token *tok);
 static Node *logor(Token **rest, Token *tok);
 static int64_t const_expr(Token **rest, Token *tok);
@@ -316,6 +318,13 @@ static Obj *new_string_literal(char *p, Type *ty) {
   Obj *var = new_anon_gvar(ty);
   var->init_data = p;
   var->init_data_size = strlen(p) + 1;
+  return var;
+}
+
+static Obj *new_raw_data_literal(char *p, int size, Type *ty) {
+  Obj *var = new_anon_gvar(ty);
+  var->init_data = p;
+  var->init_data_size = size;
   return var;
 }
 
@@ -859,6 +868,15 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
 
   Node *rhs = create_lvar_init(init, var->ty, &desg, tok);
   return new_binary(ND_COMMA, lhs, rhs, tok);
+}
+
+static void gvar_initializer(Token **rest, Token *tok, Obj *var) {
+  Initializer *init = initializer(rest, tok, var->ty, &var->ty);
+  if (init->expr) {
+    var->init_expr = new_binary(
+      ND_ASSIGN, new_var_node(var, NULL), init->expr, NULL);
+    add_type(var->init_expr);
+  }
 }
 
 // Returns true if a given token represents a type.
@@ -1960,7 +1978,9 @@ static Token *global_variable(Token *tok, Type *basety) {
     first = false;
 
     Type *ty = declarator(&tok, tok, basety);
-    new_gvar(get_ident(ty->name), ty);
+    Obj *var = new_gvar(get_ident(ty->name), ty);
+    if (equal(tok, "="))
+      gvar_initializer(&tok, tok->next, var);
   }
   return tok;
 }

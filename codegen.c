@@ -707,8 +707,14 @@ static void emit_data(Obj *prog) {
       for (int i = 0; i < var->init_data_size; i++)
         print(" 0x%hhx", var->init_data[i]);
     }
-
+    
     println("");
+    
+    if (var->init_expr) {
+      println(".initializer public");
+        gen_expr(var->init_expr, true);
+        println("  ret");
+    }
   }
 }
 
