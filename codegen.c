@@ -391,6 +391,9 @@ static void gen_expr(Node *node) {
   case ND_DIV:
     println("  div");
     return;
+  case ND_MOD:
+    println("  rem");
+    return;
   case ND_EQ:
     println("  ceq");
     return;
