@@ -275,6 +275,7 @@ struct Member {
   Type *ty;
   Token *tok; // for error message
   Token *name;
+  int idx;
   Node *offset;
 };
 
