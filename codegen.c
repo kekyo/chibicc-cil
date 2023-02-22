@@ -57,18 +57,27 @@ static void add_using_type(Type *ty) {
   using_type = pt;
 }
 
-static const char *to_cil_typename(Type *ty) {
-  if (ty->base) {
-    const char *base_name = to_cil_typename(ty->base);
-    switch (ty->kind) {
-      case TY_ARRAY:
-        return format("%s[%d]", base_name, ty->array_len);
-      case TY_PTR:
-        return format("%s*", base_name);
-    }
-    unreachable();
+static void aggregate_type(Type *ty) {
+  switch (ty->kind) {
+    case TY_PTR:
+    case TY_ARRAY:
+      aggregate_type(ty->base);
+      break;
+    case TY_ENUM:
+      add_using_type(ty);
+      break;
+    case TY_STRUCT:
+    case TY_UNION:
+      add_using_type(ty);
+      // Emit member type recursively.
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        aggregate_type(mem->ty);
+      }
+      break;
   }
+}
 
+static const char *to_cil_typename(Type *ty) {
   switch (ty->kind) {
     case TY_VOID:
       return "void";
@@ -79,10 +88,14 @@ static const char *to_cil_typename(Type *ty) {
     case TY_SHORT:
       return "int16";
     case TY_INT:
-    case TY_ENUM:  // TODO:
       return "int32";
     case TY_LONG:
       return "int64";
+    case TY_ARRAY:
+      return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
+    case TY_PTR:
+      return format("%s*", to_cil_typename(ty->base));
+    case TY_ENUM:
     case TY_STRUCT:
     case TY_UNION:
       if (ty->tag)
@@ -305,7 +318,7 @@ static void gen_expr(Node *node) {
         }
     }
     println("  sizeof %s", to_cil_typename(node->sizeof_ty));
-    add_using_type(node->sizeof_ty);
+    aggregate_type(node->sizeof_ty);
     return;
   }
   case ND_ASSIGN:
@@ -443,24 +456,7 @@ static void gen_stmt(Node *node) {
   error_tok(node->tok, "invalid statement");
 }
 
-static void aggregate_type(Type *ty) {
-  switch (ty->kind) {
-    case TY_PTR:
-    case TY_ARRAY:
-      aggregate_type(ty->base);
-      break;
-    case TY_STRUCT:
-    case TY_UNION:
-      add_using_type(ty);
-      // Emit member type recursively.
-      for (Member *mem = ty->members; mem; mem = mem->next) {
-        aggregate_type(mem->ty);
-      }
-      break;
-  }
-}
-
-static void emit_struct(Obj *prog) {
+static void emit_type(Obj *prog) {
   for (Obj *fn = prog; fn; fn = fn->next) {
     if (fn->is_function) {
       aggregate_type(fn->ty->return_ty);
@@ -479,6 +475,12 @@ static void emit_struct(Obj *prog) {
   while (using_type) {
     Type *ty = using_type->ty;
     switch (ty->kind) {
+      case TY_ENUM:
+        println(".enumeration public int32 %s", to_cil_typename(ty));
+        for (EnumMember *mem = ty->enum_members; mem; mem = mem->next) {
+          println("  %s %d", get_string(mem->name), mem->val);
+        }
+        break;
       case TY_STRUCT:
         println(".structure public %s", to_cil_typename(ty));
         for (Member *mem = ty->members; mem; mem = mem->next) {
@@ -564,5 +566,5 @@ void codegen(Obj *prog, FILE *out) {
   assign_lvar_offsets(prog);
   emit_data(prog);
   emit_text(prog);
-  emit_struct(prog);
+  emit_type(prog);
 }

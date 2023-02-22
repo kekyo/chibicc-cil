@@ -12,6 +12,7 @@
 typedef struct Type Type;
 typedef struct Node Node;
 typedef struct Member Member;
+typedef struct EnumMember EnumMember;
 
 //
 // strings.c
@@ -203,14 +204,26 @@ struct Type {
   // Array
   int array_len;
 
-  // Struct
+  // Enum/Struct/Union
   Token *tag;
+
+  // Enum
+  EnumMember *enum_members;
+
+  // Struct
   Member *members;
 
   // Function type
   Type *return_ty;
   Type *params;
   Type *next;
+};
+
+// Enum member
+struct EnumMember {
+  EnumMember *next;
+  Token *name;
+  int val;
 };
 
 // Struct member

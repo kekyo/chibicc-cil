@@ -484,14 +484,22 @@ static Type *enum_specifier(Token **rest, Token *tok) {
     return ty;
   }
 
+  ty->tag = tag;
+
   tok = skip(tok, "{");
 
   // Read an enum-list.
+  EnumMember head = { };
+  EnumMember *cur = &head;
   int i = 0;
   int val = 0;
   while (!equal(tok, "}")) {
     if (i++ > 0)
       tok = skip(tok, ",");
+    
+    EnumMember *mem = calloc(1, sizeof(EnumMember));
+    mem->name = tok;
+    cur = cur->next = mem;
 
     char *name = get_ident(tok);
     tok = tok->next;
@@ -500,6 +508,8 @@ static Type *enum_specifier(Token **rest, Token *tok) {
       val = get_number(tok->next);
       tok = tok->next->next;
     }
+    
+    mem->val = val;
 
     VarScope *sc = push_scope(name);
     sc->enum_ty = ty;
@@ -507,6 +517,7 @@ static Type *enum_specifier(Token **rest, Token *tok) {
   }
 
   *rest = tok->next;
+  ty->enum_members = head.next;
 
   if (tag)
     push_tag_scope(tag, ty);
