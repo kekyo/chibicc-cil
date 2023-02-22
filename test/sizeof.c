@@ -9,12 +9,12 @@ int main() {
   ASSERT(8, sizeof(long));
   ASSERT(8, sizeof(long int));
   ASSERT(8, sizeof(long int));
-  ASSERT(4, sizeof(char *));
-  ASSERT(4, sizeof(int *));
-  ASSERT(4, sizeof(long *));
-  ASSERT(4, sizeof(int **));
-  ASSERT(4, sizeof(int(*)[4]));
-  ASSERT(16, sizeof(int*[4]));
+  ASSERT(getptrsize(), sizeof(char *));
+  ASSERT(getptrsize(), sizeof(int *));
+  ASSERT(getptrsize(), sizeof(long *));
+  ASSERT(getptrsize(), sizeof(int **));
+  ASSERT(getptrsize(), sizeof(int(*)[4]));
+  ASSERT(getptrsize() * 4, sizeof(int*[4]));
   ASSERT(16, sizeof(int[4]));
   ASSERT(48, sizeof(int[3][4]));
   ASSERT(8, sizeof(struct {int a; int b;}));

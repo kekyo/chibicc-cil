@@ -20,6 +20,7 @@ test/%.exe: chibicc test/%.c
 
 test: $(TESTS)
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
+	for i in $^; do echo $$i; mono ./$$i || exit 1; echo; done
 	test/driver.sh
 
 clean:

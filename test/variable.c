@@ -15,7 +15,7 @@ int main() {
 
   ASSERT(4, ({ int x; sizeof(x); }));
   ASSERT(4, ({ int x; sizeof x; }));
-  ASSERT(4, ({ int *x; sizeof(x); }));
+  ASSERT(getptrsize(), ({ int *x; sizeof(x); }));
   ASSERT(16, ({ int x[4]; sizeof(x); }));
   ASSERT(48, ({ int x[3][4]; sizeof(x); }));
   ASSERT(16, ({ int x[3][4]; sizeof(*x); }));
@@ -53,8 +53,8 @@ int main() {
   ASSERT(8, ({ long x; sizeof(x); }));
   ASSERT(2, ({ short x; sizeof(x); }));
 
-  ASSERT(12, ({ char *x[3]; sizeof(x); }));
-  ASSERT(4, ({ char (*x)[3]; sizeof(x); }));
+  ASSERT(getptrsize() * 3, ({ char *x[3]; sizeof(x); }));
+  ASSERT(getptrsize(), ({ char (*x)[3]; sizeof(x); }));
   ASSERT(1, ({ char (x); sizeof(x); }));
   ASSERT(3, ({ char (x)[3]; sizeof(x); }));
   ASSERT(12, ({ char (x[3])[4]; sizeof(x); }));

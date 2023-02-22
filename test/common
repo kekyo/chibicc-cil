@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int getptrsize() {
+  return sizeof(int*);
+}
+
 void assert(int expected, int actual, char *code) {
   if (expected == actual) {
     printf("%s => %d\n", code, actual);

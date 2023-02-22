@@ -1,3 +1,8 @@
+; int getptrsize()
+.function internal int32 getptrsize
+    sizeof int32*
+    ret
+
 ; void assert(int expected, int actual, char *code)
 .function internal int32 assert expected:int32 actual:int32 code:int8*
     ; if (expected == actual)
