@@ -570,6 +570,8 @@ static Node *declaration(Token **rest, Token *tok, Type *basety) {
       tok = skip(tok, ",");
 
     Type *ty = declarator(&tok, tok, basety);
+    if (ty->size->kind == ND_NUM && ty->size->val < 0)
+      error_tok(tok, "variable has incomplete type");
     if (ty->kind == TY_VOID)
       error_tok(tok, "variable declared void");
 
@@ -1180,22 +1182,39 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
   }
 
   if (tag && !equal(tok, "{")) {
-    Type *ty = find_tag(tag);
-    if (!ty)
-      error_tok(tag, "unknown struct type");
     *rest = tok;
+
+    Type *ty = find_tag(tag);
+    if (ty)
+      return ty;
+
+    ty = struct_type();
+    static Node sizem1_node = {ND_NUM, -1};
+    ty->size = &sizem1_node;
+    ty->tag = tag;
+    push_tag_scope(tag, ty);
     return ty;
   }
 
-  // Construct a struct object.
-  Type *ty = calloc(1, sizeof(Type));
-  ty->tag = tag;
-  struct_members(rest, tok->next, ty);
-  ty->align = new_num(1, tok);
+  tok = skip(tok, "{");
 
-  // Register the struct type if a name was given.
-  if (tag)
+  // Construct a struct object.
+  Type *ty = struct_type();
+  ty->tag = tag;
+  struct_members(rest, tok, ty);
+
+  if (tag) {
+    // If this is a redefinition, overwrite a previous type.
+    // Otherwise, register the struct type.
+    for (TagScope *sc = scope->tags; sc; sc = sc->next) {
+      if (equal(tag, sc->name)) {
+        *sc->ty = *ty;
+        return sc->ty;
+      }
+    }
     push_tag_scope(tag, ty);
+  }
+
   return ty;
 }
 
@@ -1203,6 +1222,9 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
 static Type *struct_decl(Token **rest, Token *tok) {
   Type *ty = struct_union_decl(rest, tok);
   ty->kind = TY_STRUCT;
+
+  if (ty->size->kind == ND_NUM && ty->size->val < 0)
+    return ty;
 
   // Assign offsets within the struct to members.
   Node *offset = new_num(0, tok);
@@ -1225,6 +1247,9 @@ static Type *struct_decl(Token **rest, Token *tok) {
 static Type *union_decl(Token **rest, Token *tok) {
   Type *ty = struct_union_decl(rest, tok);
   ty->kind = TY_UNION;
+
+  if (ty->size->kind == ND_NUM && ty->size->val < 0)
+    return ty;
 
   // We need to compute the alignment and the size though.
   Node *zero = new_num(0, tok);
@@ -1367,6 +1392,7 @@ static Node *funcall(Token **rest, Token *tok) {
 // primary = "(" "{" stmt+ "}" ")"
 //         | "(" expr ")"
 //         | "sizeof" "(" type-name ")"
+//         | "sizeof" unary
 //         | ident func-args?
 //         | str
 //         | num

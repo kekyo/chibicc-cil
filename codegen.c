@@ -50,11 +50,19 @@ int calculate_size(Type *ty) {
   return -1;
 }
 
-static void add_using_type(Type *ty) {
-  UsingType *pt = calloc(sizeof(UsingType), 1);
+static bool add_using_type(Type *ty) {
+  UsingType *pt = using_type;
+  while (pt) {
+    if (pt->ty == ty)
+      return false;
+    pt = pt->next;
+  }
+
+  pt = calloc(sizeof(UsingType), 1);
   pt->ty = ty;
   pt->next = using_type;
   using_type = pt;
+  return true;
 }
 
 static void aggregate_type(Type *ty) {
@@ -68,10 +76,10 @@ static void aggregate_type(Type *ty) {
       break;
     case TY_STRUCT:
     case TY_UNION:
-      add_using_type(ty);
-      // Emit member type recursively.
-      for (Member *mem = ty->members; mem; mem = mem->next) {
-        aggregate_type(mem->ty);
+      if (add_using_type(ty)) {
+        // Emit member type recursively.
+        for (Member *mem = ty->members; mem; mem = mem->next)
+          aggregate_type(mem->ty);
       }
       break;
   }

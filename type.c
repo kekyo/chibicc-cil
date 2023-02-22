@@ -1,5 +1,9 @@
 #include "chibicc.h"
 
+static Node size0_node = {ND_NUM, 0};
+static Node size1_node = {ND_NUM, 1};
+static Node size4_node = {ND_NUM, 4};
+
 Type *ty_void = &(Type){TY_VOID, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
 Type *ty_bool = &(Type){TY_BOOL, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
 
@@ -53,8 +57,15 @@ Type *array_of(Type *base, int len) {
 
 Type *enum_type(void) {
   Type *ty = new_type(TY_ENUM);
-  ty->align = ty_int->align;
-  ty->size = ty_int->size;
+  ty->align = &size4_node;
+  ty->size = &size4_node;
+  return ty;
+}
+
+Type *struct_type(void) {
+  Type *ty = new_type(TY_STRUCT);
+  ty->align = &size1_node;
+  ty->size = &size0_node;
   return ty;
 }
 
