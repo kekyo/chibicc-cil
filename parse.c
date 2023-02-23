@@ -116,7 +116,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety);
 static void initializer2(Token **rest, Token *tok, Initializer *init);
 static Initializer *initializer(Token **rest, Token *tok, Type *ty, Type **new_ty);
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var);
-static void gvar_initializer(Token **rest, Token *tok, Obj *var);
+static Node *gvar_initializer(Token **rest, Token *tok, Obj *var);
 static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
 static Node *expr_stmt(Token **rest, Token *tok);
@@ -870,13 +870,12 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
   return new_binary(ND_COMMA, lhs, rhs, tok);
 }
 
-static void gvar_initializer(Token **rest, Token *tok, Obj *var) {
+static Node *gvar_initializer(Token **rest, Token *tok, Obj *var) {
   Initializer *init = initializer(rest, tok, var->ty, &var->ty);
-  if (init->expr) {
-    var->init_expr = new_binary(
-      ND_ASSIGN, new_var_node(var, NULL), init->expr, NULL);
-    add_type(var->init_expr);
-  }
+  InitDesg desg = {NULL, 0, NULL, var};
+
+  Node *init_expr = create_lvar_init(init, var->ty, &desg, tok);
+  return reduce(init_expr);
 }
 
 // Returns true if a given token represents a type.
@@ -1980,7 +1979,7 @@ static Token *global_variable(Token *tok, Type *basety) {
     Type *ty = declarator(&tok, tok, basety);
     Obj *var = new_gvar(get_ident(ty->name), ty);
     if (equal(tok, "="))
-      gvar_initializer(&tok, tok->next, var);
+      var->init_expr = gvar_initializer(&tok, tok->next, var);
   }
   return tok;
 }

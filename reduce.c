@@ -29,6 +29,8 @@ static Node *reduce_node(Node *node) {
   case ND_COMMA:
     lhs = reduce_node(node->lhs);
     rhs = reduce_node(node->rhs);
+    if (lhs->kind == ND_NULL_EXPR)
+      return rhs;
     return new_binary(ND_COMMA, lhs, rhs, node->tok);
   case ND_NEG:
   case ND_NOT:
@@ -50,7 +52,7 @@ static Node *reduce_node(Node *node) {
     break;
   case ND_CAST:
     lhs = reduce_node(node->lhs);
-    if (node->kind == ND_NUM) {
+    if (lhs->kind == ND_NUM) {
       switch (node->ty->kind) {
       case TY_BOOL:
         return new_num(lhs->val ? 1 : 0, node->tok);
@@ -67,6 +69,10 @@ static Node *reduce_node(Node *node) {
       unreachable();
     }
     return new_cast(lhs, node->ty);
+  case ND_ASSIGN:
+    lhs = reduce_node(node->lhs);
+    rhs = reduce_node(node->rhs);
+    return new_binary(ND_ASSIGN, lhs, rhs, node->tok);
   default:
     return node;
   }
@@ -117,5 +123,7 @@ static Node *reduce_node(Node *node) {
 
 Node *reduce(Node *node) {
   add_type(node);
-  return reduce_node(node);
+  node = reduce_node(node);
+  add_type(node);
+  return node;
 }
