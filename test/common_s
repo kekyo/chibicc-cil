@@ -120,3 +120,16 @@ ENTER:
     ldsflda ext1
     stind.i
     ret
+
+; int ext3 = 7;
+.global public int32 ext3 0x07 0x00 0x00 0x00
+
+; int ext_fn1(int x) { return x; }
+.function public int32 ext_fn1 x:int32
+    ldarg.0
+    ret
+
+; int ext_fn2(int x) { return x; }
+.function public int32 ext_fn2 x:int32
+    ldarg.0
+    ret
