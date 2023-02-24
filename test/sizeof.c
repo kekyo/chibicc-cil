@@ -34,6 +34,8 @@ int main() {
   ASSERT(getptrsize(), sizeof(int(*)[10]));
   ASSERT(getptrsize(), sizeof(int(*)[][10]));
 
+  ASSERT(4, sizeof(struct { int x, y[]; }));
+
   printf("OK\n");
   return 0;
 }
