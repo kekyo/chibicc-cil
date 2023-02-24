@@ -198,7 +198,7 @@ Node *new_num(int64_t val, Token *tok) {
   return node;
 }
 
-static Node *new_long(int64_t val, Token *tok) {
+Node *new_long(int64_t val, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->val = val;
   node->ty = ty_long;

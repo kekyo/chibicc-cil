@@ -152,8 +152,14 @@ static void gen_addr(Node *node) {
     return;
   case ND_MEMBER:
     gen_addr(node->lhs);
-    gen_expr(node->member->offset, false);
-    println("  add");
+    // Suppress of the calculation for offset 0 might be done by reducer,
+    // but ND_MEMBER is lost when suppress by reducer.
+    // As a result, if special consideration is needed for member access,
+    // it will be inaccessible.
+    if (node->member->offset->kind != ND_NUM || node->member->offset->val != 0) {
+      gen_expr(node->member->offset, false);
+      println("  add");
+    }
     return;
   }
 

@@ -6,8 +6,34 @@ static Node *reduce_node(Node *node) {
 
   switch (node->kind) {
   case ND_ADD:
-  case ND_SUB:
+    lhs = reduce_node(node->lhs);
+    rhs = reduce_node(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return rhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return lhs;
+      else
+        return new_binary(node->kind, lhs, rhs, node->tok);
+    }
+    break;
   case ND_MUL:
+    lhs = reduce_node(node->lhs);
+    rhs = reduce_node(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return lhs;
+      else if (lhs->kind == ND_NUM && lhs->val == 1)
+        return rhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return rhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 1)
+        return lhs;
+      else
+        return new_binary(node->kind, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_SUB:
   case ND_DIV:
   case ND_MOD:
   case ND_BITAND:
@@ -60,21 +86,44 @@ static Node *reduce_node(Node *node) {
         return new_num((uint8_t)lhs->val, node->tok);
       case TY_SHORT:
         return new_num((uint16_t)lhs->val, node->tok);
-      case TY_INT:
       case TY_ENUM:
+      case TY_INT:
         return new_num((uint32_t)lhs->val, node->tok);
       case TY_LONG:
-        return lhs;
+        return new_long(lhs->val, node->tok);
+      case TY_PTR: {
+        Node *nnode = new_num(lhs->val, node->tok);
+        nnode->ty = node->ty;
+        return nnode;
       }
-      unreachable();
+      }
     }
     return new_cast(lhs, node->ty);
   case ND_ASSIGN:
     lhs = reduce_node(node->lhs);
     rhs = reduce_node(node->rhs);
     return new_binary(ND_ASSIGN, lhs, rhs, node->tok);
-  default:
+  case ND_ADDR:
+  case ND_DEREF: {
+    lhs = reduce_node(node->lhs);
+    Node *nnode = new_node(node->kind, node->tok);
+    nnode->lhs = lhs;
+    return nnode;
+  }
+  case ND_MEMBER: {
+    lhs = reduce_node(node->lhs);
+    Node *nnode = new_node(ND_MEMBER, node->tok);
+    nnode->lhs = lhs;
+    nnode->member = node->member;
+    return nnode;
+  }
+  case ND_NUM:
+  case ND_VAR:
+  case ND_SIZEOF:
+  case ND_NULL_EXPR:
     return node;
+  default:
+    unreachable();
   }
 
   switch (node->kind) {
