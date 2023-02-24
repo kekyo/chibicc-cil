@@ -109,3 +109,14 @@ ENTER:
     bgt.s LOOP
     ldc.i4.0
     ret
+
+; int ext1 = 5;
+.global public int32 ext1 0x05 0x00 0x00 0x00
+
+; int *ext2 = &ext1;
+.global public int32* ext2
+.initializer public
+    ldsflda ext2
+    ldsflda ext1
+    stind.i
+    ret

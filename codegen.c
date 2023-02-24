@@ -704,7 +704,7 @@ static void assign_lvar_offsets(Obj *prog) {
 
 static void emit_data(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function)
+    if (var->is_function || !var->is_definition)
       continue;
 
     print(".global public %s %s", to_cil_typename(var->ty), var->name);
