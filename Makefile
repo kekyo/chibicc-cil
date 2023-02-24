@@ -14,9 +14,12 @@ chibicc: $(OBJS)
 
 $(OBJS): chibicc.h
 
-test/%.exe: chibicc test/%.c
+test/common.s: chibicc test/common
+	$(CC) -o- -E -P -C -xc test/common | ./chibicc -o $@ -
+
+test/%.exe: chibicc test/%.c test/common.s test/common_s
 	$(CC) -o- -E -P -C test/$*.c | ./chibicc -o test/$*.s -
-	$(AS) $(ASFLAGS) -o $@ test/$*.s test/common_s
+	$(AS) $(ASFLAGS) -o $@ test/$*.s test/common.s test/common_s
 
 test: $(TESTS)
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done

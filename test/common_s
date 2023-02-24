@@ -41,11 +41,6 @@ L_EXIT:
     call System.Console.Write string
     ret
 
-; static int static_fn() { return 5; }
-.function file int32 static_fn
-    ldc.i4.s 5
-    ret
-
 ; int strcmp(char *p, char *q);
 .function internal int strcmp p:int8* q:int8*
 LOOP:
@@ -108,28 +103,4 @@ ENTER:
     conv.i8
     bgt.s LOOP
     ldc.i4.0
-    ret
-
-; int ext1 = 5;
-.global public int32 ext1 0x05 0x00 0x00 0x00
-
-; int *ext2 = &ext1;
-.global public int32* ext2
-.initializer public
-    ldsflda ext2
-    ldsflda ext1
-    stind.i
-    ret
-
-; int ext3 = 7;
-.global public int32 ext3 0x07 0x00 0x00 0x00
-
-; int ext_fn1(int x) { return x; }
-.function public int32 ext_fn1 x:int32
-    ldarg.0
-    ret
-
-; int ext_fn2(int x) { return x; }
-.function public int32 ext_fn2 x:int32
-    ldarg.0
     ret
