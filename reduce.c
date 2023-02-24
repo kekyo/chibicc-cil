@@ -120,6 +120,7 @@ static Node *reduce_node(Node *node) {
   case ND_NUM:
   case ND_VAR:
   case ND_SIZEOF:
+  case ND_MEMZERO:
   case ND_NULL_EXPR:
     return node;
   default:

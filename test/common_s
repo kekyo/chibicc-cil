@@ -45,3 +45,67 @@ L_EXIT:
 .function file int32 static_fn
     ldc.i4.s 5
     ret
+
+; int strcmp(char *p, char *q);
+.function internal int strcmp p:int8* q:int8*
+LOOP:
+    ldarg.0
+    ldind.i1
+    ldarg.1
+    ldind.i1
+    sub
+    dup
+    brfalse.s NEXT1
+    ret
+NEXT1:
+    pop
+    ldarg.0
+    ldind.i1
+    brtrue.s NEXT2
+    ldc.i4.0
+    ret
+NEXT2:
+    ldarg.0
+    ldc.i4.1
+    add
+    starg.s 0
+    ldarg.1
+    ldc.i4.1
+    add
+    starg.s 1
+    br.s LOOP
+
+; int memcmp(char *p, char *q, long n);
+.function internal int memcmp p:int8* q:int8* n:int64
+    br.s ENTER
+LOOP:
+    ldarg.0
+    ldind.i1
+    ldarg.1
+    ldind.i1
+    sub
+    dup
+    brfalse.s NEXT
+    ret
+NEXT:
+    pop
+    ldarg.0
+    ldc.i4.1
+    add
+    starg.s 0
+    ldarg.1
+    ldc.i4.1
+    add
+    starg.s 1
+    ldarg.2
+    ldc.i4.1
+    conv.i8
+    sub
+    starg.s 2
+ENTER:
+    ldarg.2
+    ldc.i4.0
+    conv.i8
+    bgt.s LOOP
+    ldc.i4.0
+    ret
