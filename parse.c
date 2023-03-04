@@ -119,7 +119,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr);
 static void initializer2(Token **rest, Token *tok, Initializer *init);
 static Initializer *initializer(Token **rest, Token *tok, Type *ty, Type **new_ty);
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var);
-static Node *gvar_initializer(Token **rest, Token *tok, Obj *var);
+static void gvar_initializer(Token **rest, Token *tok, Obj *var);
 static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
 static Node *expr_stmt(Token **rest, Token *tok);
@@ -709,6 +709,15 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr) 
     if (ty->kind == TY_VOID)
       error_tok(tok, "variable declared void");
 
+    if (attr && attr->is_static) {
+      // static local variable
+      Obj *var = new_anon_gvar(ty);
+      push_scope(get_ident(ty->name))->var = var;
+      if (equal(tok, "="))
+        gvar_initializer(&tok, tok->next, var);
+      continue;
+    }
+
     Obj *var = new_lvar(get_ident(ty->name), ty);
     if (attr && attr->align)
       var->align = attr->align;
@@ -1008,12 +1017,12 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
   return new_binary(ND_COMMA, lhs, rhs, tok);
 }
 
-static Node *gvar_initializer(Token **rest, Token *tok, Obj *var) {
+static void gvar_initializer(Token **rest, Token *tok, Obj *var) {
   Initializer *init = initializer(rest, tok, var->ty, &var->ty);
   InitDesg desg = {NULL, 0, NULL, var};
 
   Node *init_expr = create_lvar_init(init, var->ty, &desg, tok);
-  return reduce_node(init_expr);
+  var->init_expr = reduce_node(init_expr);
 }
 
 // Returns true if a given token represents a type.
@@ -2184,7 +2193,7 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
       var->align = attr->align;
 
     if (equal(tok, "="))
-      var->init_expr = gvar_initializer(&tok, tok->next, var);
+      gvar_initializer(&tok, tok->next, var);
   }
   return tok;
 }
