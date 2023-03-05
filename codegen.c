@@ -743,7 +743,10 @@ static void emit_data(Obj *prog) {
     if (var->is_function || !var->is_definition)
       continue;
 
-    print(".global public %s %s", to_cil_typename(var->ty), var->name);
+    if (var->is_static)
+      print(".global file %s %s", to_cil_typename(var->ty), var->name);
+    else
+      print(".global public %s %s", to_cil_typename(var->ty), var->name);
 
     if (var->init_data) {
       for (int i = 0; i < var->init_data_size; i++)
