@@ -627,7 +627,8 @@ static bool gen_stmt(Node *node) {
     println("%s:", node->unique_label);
     return gen_stmt(node->lhs);
   case ND_RETURN:
-    gen_expr(node->lhs, false);
+    if (node->lhs)
+      gen_expr(node->lhs, false);
     println("  br _L_return");
     return false;
   case ND_EXPR_STMT:
