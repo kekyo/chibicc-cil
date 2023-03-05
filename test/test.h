@@ -3,5 +3,6 @@
 int getptrsize();
 void assert(int expected, int actual, char *code);
 void printf(char *arg);
+int sprintf();
 int strcmp(char *p, char *q);
 int memcmp(char *p, char *q, long n);

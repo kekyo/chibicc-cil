@@ -473,12 +473,29 @@ static void gen_expr(Node *node, bool will_discard) {
     return;
   }
   case ND_FUNCALL:
-    for (Node *arg = node->args; arg; arg = arg->next) {
+    for (Node *arg = node->args; arg; arg = arg->next)
       gen_expr(arg, false);
-    }
     println("  call %s", node->funcname);
-    if (will_discard && node->ty->kind != TY_VOID)
-      println("  pop");
+    if (will_discard) {
+      if (node->ty->kind != TY_VOID)
+        println("  pop");
+    } else {
+      switch (node->ty->kind) {
+      case TY_BOOL:
+        println("  conv.i1");
+        println("  ldc.i4.0");
+        println("  ceq");
+        println("  ldc.i4.0");
+        println("  ceq");
+        return;
+      case TY_CHAR:
+        println("  conv.i1");
+        return;
+      case TY_SHORT:
+        println("  conv.i2");
+        return;
+      }
+    }
     return;
   }
 
