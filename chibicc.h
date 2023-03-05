@@ -306,7 +306,9 @@ void add_type(Node *node);
 int calculate_size(Type *ty);
 Node *align_to_node(Node *n, Node *align, Token *tok);
 void pretty_print_node(Node *node);
-Node *reduce(Node *node);
+bool equals_type(Type *lhs, Type *rhs);
+bool equals_node(Node *lhs, Node *rhs);
+Node *reduce_node(Node *node);
 
 //
 // codegen.c

@@ -901,7 +901,7 @@ static Initializer *initializer(Token **rest, Token *tok, Type *ty, Type **new_t
     while (mem->next)
       mem = mem->next;
     mem->ty = init->children[mem->idx]->ty;
-    ty->size = reduce(new_binary(ND_ADD, ty->size, mem->ty->size, tok));
+    ty->size = reduce_node(new_binary(ND_ADD, ty->size, mem->ty->size, tok));
 
     *new_ty = ty;
     return init;
@@ -990,7 +990,7 @@ static Node *gvar_initializer(Token **rest, Token *tok, Obj *var) {
   InitDesg desg = {NULL, 0, NULL, var};
 
   Node *init_expr = create_lvar_init(init, var->ty, &desg, tok);
-  return reduce(init_expr);
+  return reduce_node(init_expr);
 }
 
 // Returns true if a given token represents a type.
@@ -1789,7 +1789,7 @@ static Type *struct_decl(Token **rest, Token *tok) {
   // Assign offsets within the struct to members.
   Node *offset = new_num(0, tok);
   for (Member *mem = ty->members; mem; mem = mem->next) {
-    offset = reduce(align_to_node(offset, mem->ty->align, tok));
+    offset = reduce_node(align_to_node(offset, mem->ty->align, tok));
     mem->offset = offset;
     offset = new_binary(ND_ADD, offset, mem->ty->size, tok);
 
@@ -1797,9 +1797,9 @@ static Type *struct_decl(Token **rest, Token *tok) {
     align_cond->cond = new_binary(ND_LT, ty->align, mem->ty->align, tok);
     align_cond->then = mem->ty->align;
     align_cond->els = ty->align;
-    ty->align = reduce(align_cond);
+    ty->align = reduce_node(align_cond);
   }
-  ty->size = reduce(align_to_node(offset, ty->align, tok));
+  ty->size = reduce_node(align_to_node(offset, ty->align, tok));
   return ty;
 }
 
@@ -1822,15 +1822,15 @@ static Type *union_decl(Token **rest, Token *tok) {
     align_cond->cond = new_binary(ND_LT, ty->align, mem->ty->align, tok);
     align_cond->then = mem->ty->align;
     align_cond->els = ty->align;
-    ty->align = reduce(align_cond);
+    ty->align = reduce_node(align_cond);
 
     Node *size_cond = new_node(ND_COND, tok);
     size_cond->cond = new_binary(ND_LT, ty->size, mem->ty->size, tok);
     size_cond->then = mem->ty->size;
     size_cond->els = ty->size;
-    ty->size = reduce(size_cond);
+    ty->size = reduce_node(size_cond);
   }
-  ty->size = reduce(align_to_node(ty->size, ty->align, tok));
+  ty->size = reduce_node(align_to_node(ty->size, ty->align, tok));
   return ty;
 }
 

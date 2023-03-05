@@ -99,26 +99,172 @@ void pretty_print_node(Node *node) {
   fprintf(stderr, "%s\n", pp);
 }
 
-static Node *reduce_node(Node *node) {
+bool equals_type(Type *lhs, Type *rhs) {
+  if (lhs == NULL || rhs == NULL)
+    // Be not added types on add_type().
+    unreachable();
+  if (lhs == rhs)
+    return true;
+  if (lhs->kind != rhs->kind)
+    return false;
+
+  switch (lhs->kind) {
+    case TY_PTR:
+      return equals_type(lhs->base, rhs->base);
+    case TY_ARRAY:
+      return equals_type(lhs->base, rhs->base) && lhs->array_len == rhs->array_len;
+    case TY_VOID:
+    case TY_BOOL:
+    case TY_CHAR:
+    case TY_SHORT:
+    case TY_INT:
+    case TY_LONG:
+      return true;
+    case TY_ENUM:
+    case TY_STRUCT:
+    case TY_UNION:
+      return false;
+    default:
+      unreachable();
+  }
+}
+
+bool equals_node(Node *lhs, Node *rhs) {
+  if (lhs == rhs)
+    return true;
+  if (lhs == NULL || rhs == NULL)
+    return false;
+  if (lhs->kind != rhs->kind)
+    return false;
+
+  switch (lhs->kind) {
+    case ND_ADD:
+    case ND_SUB:
+    case ND_MUL:
+    case ND_DIV:
+    case ND_MOD:
+    case ND_BITAND:
+    case ND_BITOR:
+    case ND_BITXOR:
+    case ND_SHL:
+    case ND_SHR:
+    case ND_EQ:
+    case ND_NE:
+    case ND_LT:
+    case ND_LE:
+    case ND_LOGAND:
+    case ND_LOGOR:
+    case ND_COMMA:
+    case ND_ASSIGN:
+      return
+        equals_node(lhs->lhs, rhs->lhs) &&
+        equals_node(lhs->rhs, rhs->rhs);
+    case ND_NEG:
+    case ND_NOT:
+    case ND_BITNOT:
+    case ND_ADDR:
+    case ND_DEREF:
+      return equals_node(lhs->lhs, rhs->lhs);
+    case ND_CAST:
+      return
+        equals_type(lhs->ty, rhs->ty) &&
+        equals_node(lhs->lhs, rhs->lhs);
+    case ND_MEMBER:
+      if (!equals_node(lhs->lhs, rhs->lhs))
+        return false;
+      return lhs->member == rhs->member;
+    case ND_COND:
+      return
+        equals_node(lhs->cond, rhs->cond) &&
+        equals_node(lhs->then, rhs->then) &&
+        equals_node(lhs->els, rhs->els);
+    case ND_NUM:
+      return lhs->val == rhs->val;
+    case ND_VAR:
+    case ND_MEMZERO:
+      return lhs->var == rhs->var;
+    case ND_SIZEOF:
+      return equals_type(lhs->sizeof_ty, rhs->sizeof_ty);
+    case ND_NULL_EXPR:
+      return true;
+    default:
+      unreachable();
+  }
+}
+
+static bool is_immutable(Node *node) {
+  switch (node->kind) {
+    case ND_ADD:
+    case ND_SUB:
+    case ND_MUL:
+    case ND_DIV:
+    case ND_MOD:
+    case ND_BITAND:
+    case ND_BITOR:
+    case ND_BITXOR:
+    case ND_SHL:
+    case ND_SHR:
+    case ND_EQ:
+    case ND_NE:
+    case ND_LT:
+    case ND_LE:
+    case ND_LOGAND:
+    case ND_LOGOR:
+    case ND_COMMA:
+    case ND_ASSIGN:
+      return is_immutable(node->lhs) && is_immutable(node->rhs);
+    case ND_NEG:
+    case ND_NOT:
+    case ND_BITNOT:
+    case ND_ADDR:
+    case ND_DEREF:
+    case ND_CAST:
+      return is_immutable(node->lhs);
+    case ND_COND:
+      return is_immutable(node->cond) && is_immutable(node->then) && is_immutable(node->els);
+    case ND_MEMBER:
+    case ND_VAR:
+      return false;
+    case ND_NUM:
+    case ND_MEMZERO:
+    case ND_SIZEOF:
+    case ND_NULL_EXPR:
+      return true;
+    default:
+      unreachable();
+  }
+}
+
+static Node *reduce(Node *node) {
   Node *lhs;
   Node *rhs;
 
   switch (node->kind) {
   case ND_ADD:
-    lhs = reduce_node(node->lhs);
-    rhs = reduce_node(node->rhs);
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
     if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
       if (lhs->kind == ND_NUM && lhs->val == 0)
         return rhs;
       else if (rhs->kind == ND_NUM && rhs->val == 0)
         return lhs;
       else
-        return new_binary(node->kind, lhs, rhs, node->tok);
+        return new_binary(ND_ADD, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_SUB:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (rhs->kind == ND_NUM && rhs->val == 0)
+        return lhs;
+      else
+        return new_binary(ND_SUB, lhs, rhs, node->tok);
     }
     break;
   case ND_MUL:
-    lhs = reduce_node(node->lhs);
-    rhs = reduce_node(node->rhs);
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
     if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
       if (lhs->kind == ND_NUM && lhs->val == 0)
         return lhs;
@@ -129,54 +275,172 @@ static Node *reduce_node(Node *node) {
       else if (rhs->kind == ND_NUM && rhs->val == 1)
         return lhs;
       else
+        return new_binary(ND_MUL, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_DIV:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return lhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 1)
+        return lhs;
+      else
+        return new_binary(ND_DIV, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_MOD:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return lhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 1)
+        return new_num(0, node->tok);
+      else
+        return new_binary(ND_MOD, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_BITAND:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return new_num(0, node->tok);
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return new_num(0, node->tok);
+      else
+        return new_binary(ND_BITAND, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_BITOR:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return rhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return lhs;
+      else
+        return new_binary(ND_BITOR, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_BITXOR:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return rhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return lhs;
+      else
+        return new_binary(ND_BITXOR, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_SHL:
+  case ND_SHR:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return new_num(0, node->tok);
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return lhs;
+      else
         return new_binary(node->kind, lhs, rhs, node->tok);
     }
     break;
-  case ND_SUB:
-  case ND_DIV:
-  case ND_MOD:
-  case ND_BITAND:
-  case ND_BITOR:
-  case ND_BITXOR:
-  case ND_SHL:
-  case ND_SHR:
-  case ND_EQ:
-  case ND_NE:
-  case ND_LT:
-  case ND_LE:
   case ND_LOGAND:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return lhs;
+      else if (lhs->kind == ND_NUM && lhs->val != 0)
+        return rhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return rhs;
+      else if (rhs->kind == ND_NUM && rhs->val != 0)
+        return lhs;
+      else
+        return new_binary(ND_LOGAND, lhs, rhs, node->tok);
+    }
+    break;
   case ND_LOGOR:
-    lhs = reduce_node(node->lhs);
-    rhs = reduce_node(node->rhs);
-    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM)
-      return new_binary(node->kind, lhs, rhs, node->tok);
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (lhs->kind != ND_NUM || rhs->kind != ND_NUM) {
+      if (lhs->kind == ND_NUM && lhs->val == 0)
+        return rhs;
+      else if (lhs->kind == ND_NUM && lhs->val != 0)
+        return lhs;
+      else if (rhs->kind == ND_NUM && rhs->val == 0)
+        return lhs;
+      else if (rhs->kind == ND_NUM && rhs->val != 0)
+        return rhs;
+      else
+        return new_binary(ND_LOGOR, lhs, rhs, node->tok);
+    }
+    break;
+  case ND_EQ:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (equals_node(lhs, rhs) && is_immutable(lhs))
+      return new_num(1, node->tok);
+    else
+      return new_binary(ND_EQ, lhs, rhs, node->tok);
+    break;
+  case ND_NE:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (equals_node(lhs, rhs) && is_immutable(lhs))
+      return new_num(0, node->tok);
+    else
+      return new_binary(ND_NE, lhs, rhs, node->tok);
+    break;
+  case ND_LE:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (equals_node(lhs, rhs) && is_immutable(lhs))
+      return new_num(1, node->tok);
+    else if (lhs->kind != ND_NUM || rhs->kind != ND_NUM)
+      return new_binary(ND_LE, lhs, rhs, node->tok);
+    break;
+  case ND_LT:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    if (equals_node(lhs, rhs) && is_immutable(lhs))
+      return new_num(0, node->tok);
+    else if (lhs->kind != ND_NUM || rhs->kind != ND_NUM)
+      return new_binary(ND_LT, lhs, rhs, node->tok);
     break;
   case ND_COMMA:
-    lhs = reduce_node(node->lhs);
-    rhs = reduce_node(node->rhs);
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
     if (lhs->kind == ND_NULL_EXPR)
       return rhs;
     return new_binary(ND_COMMA, lhs, rhs, node->tok);
   case ND_NEG:
   case ND_NOT:
   case ND_BITNOT:
-    lhs = reduce_node(node->lhs);
+    lhs = reduce(node->lhs);
     if (lhs->kind != ND_NUM)
       return new_unary(node->kind, lhs, node->tok);
     break;
   case ND_COND:
-    lhs = reduce_node(node->cond);
+    lhs = reduce(node->cond);
     if (lhs->kind != ND_NUM) {
       Node *cond = new_node(ND_COND, node->tok);
       cond->cond = lhs;
-      cond->then = reduce_node(node->then);
-      cond->els = reduce_node(node->els);
+      cond->then = reduce(node->then);
+      cond->els = reduce(node->els);
       return cond;
     } else
-      return lhs->val ? reduce_node(node->then) : reduce_node(node->els);
+      return lhs->val ? reduce(node->then) : reduce(node->els);
     break;
   case ND_CAST:
-    lhs = reduce_node(node->lhs);
+    lhs = reduce(node->lhs);
     if (lhs->kind == ND_NUM) {
       switch (node->ty->kind) {
       case TY_BOOL:
@@ -199,18 +463,18 @@ static Node *reduce_node(Node *node) {
     }
     return new_cast(lhs, node->ty);
   case ND_ASSIGN:
-    lhs = reduce_node(node->lhs);
-    rhs = reduce_node(node->rhs);
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
     return new_binary(ND_ASSIGN, lhs, rhs, node->tok);
   case ND_ADDR:
   case ND_DEREF: {
-    lhs = reduce_node(node->lhs);
+    lhs = reduce(node->lhs);
     Node *nnode = new_node(node->kind, node->tok);
     nnode->lhs = lhs;
     return nnode;
   }
   case ND_MEMBER: {
-    lhs = reduce_node(node->lhs);
+    lhs = reduce(node->lhs);
     Node *nnode = new_node(ND_MEMBER, node->tok);
     nnode->lhs = lhs;
     nnode->member = node->member;
@@ -270,9 +534,9 @@ static Node *reduce_node(Node *node) {
   unreachable();
 }
 
-Node *reduce(Node *node) {
+Node *reduce_node(Node *node) {
   add_type(node);
-  node = reduce_node(node);
+  node = reduce(node);
   add_type(node);
   return node;
 }
