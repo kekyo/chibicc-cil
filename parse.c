@@ -1732,16 +1732,6 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
   ty->members = head.next;
 }
 
-static Node *align_to_node(Node *n, Node *align, Token *tok) {
-  // (n + align - 1) / align * align;
-  Node *next = new_binary(
-    ND_SUB, new_binary(ND_ADD, n, align, tok), new_num(1, tok), tok);
-  Node *based = new_binary(
-    ND_DIV, next, align, tok);
-  return new_binary(
-    ND_MUL, based, align, tok);
-}
-
 // struct-union-decl = ident? ("{" struct-members)?
 static Type *struct_union_decl(Token **rest, Token *tok) {
   // Read a tag.

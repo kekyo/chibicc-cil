@@ -300,9 +300,12 @@ Type *struct_type(void);
 void add_type(Node *node);
 
 //
-// reduce.c
+// utils.c
 //
 
+int calculate_size(Type *ty);
+Node *align_to_node(Node *n, Node *align, Token *tok);
+void pretty_print_node(Node *node);
 Node *reduce(Node *node);
 
 //

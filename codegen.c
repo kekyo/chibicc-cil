@@ -35,21 +35,6 @@ static int count(void) {
   return i++;
 }
 
-int calculate_size(Type *ty) {
-  if (ty->size && ty->size->kind == ND_NUM)
-    return ty->size->val;
-  switch (ty->kind) {
-    case TY_ARRAY: {
-      int sz = calculate_size(ty->base);
-      if (sz >= 0) {
-        return sz * ty->array_len;
-      }
-      break;
-    }
-  }
-  return -1;
-}
-
 static bool add_using_type(Type *ty) {
   UsingType *pt = using_type;
   while (pt) {
