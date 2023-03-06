@@ -82,6 +82,7 @@ struct Obj {
   char *name;    // Variable name
   Type *ty;      // Type
   ObjKind kind;
+  Node *align;   // alignment
 
   // Local variable
   int offset;
@@ -232,6 +233,7 @@ struct Type {
   TypeKind kind;
   Node *size;      // sizeof() value
   Node *align;     // alignment
+  Node *origin_size;
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -279,7 +281,9 @@ struct Member {
   Token *tok; // for error message
   Token *name;
   int idx;
+  Node *align;
   Node *offset;
+  Node *origin_offset;
 };
 
 extern Type *ty_void;
@@ -314,5 +318,4 @@ Node *reduce_node(Node *node);
 // codegen.c
 //
 
-int calculate_size(Type *ty);
 void codegen(Obj *prog, FILE *out);

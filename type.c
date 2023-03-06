@@ -86,8 +86,10 @@ static Type *get_common_type(Type *ty1, Type *ty2, Token *tok) {
 // This operation is called the "usual arithmetic conversion".
 static void usual_arith_conv(Node **lhs, Node **rhs, Token *tok) {
   Type *ty = get_common_type((*lhs)->ty, (*rhs)->ty, tok);
-  *lhs = new_cast(*lhs, ty);
-  *rhs = new_cast(*rhs, ty);
+  if (!equals_type(ty, (*lhs)->ty))
+    *lhs = new_cast(*lhs, ty);
+  if (!equals_type(ty, (*rhs)->ty))
+    *rhs = new_cast(*rhs, ty);
 }
 
 void add_type(Node *node) {

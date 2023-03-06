@@ -650,16 +650,53 @@ static void emit_type(Obj *prog) {
           println("  %s %d", get_string(mem->name), mem->val);
         }
         break;
-      case TY_STRUCT:
+      case TY_STRUCT: {
         println(".structure public %s", to_cil_typename(ty));
+        Node zero = {ND_NUM, 0};
+        Node *last_offset = &zero;
+        Node *last_size = &zero;
         for (Member *mem = ty->members; mem; mem = mem->next) {
-          println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
+          // Exactly equals both offsets.
+          if (equals_node(mem->offset, mem->origin_offset))
+            println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
+          // Couldn't adjust with padding when offset/size is not concrete.
+          // (Because mem->offset and ty->size are reduced.)
+          else if (mem->offset->kind != ND_NUM || last_size->kind != ND_NUM)
+            error_tok(mem->name, "Could not adjust on alignment this member.");
+          // (Assertion for concrete numeric value.)
+          else if (last_offset->kind == ND_NUM) {
+            int64_t pad_start = last_offset->val + last_size->val;
+            int64_t pad_size = mem->offset->val - pad_start;
+            println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
+            println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
+          } else
+            unreachable();
+          last_offset = mem->offset;
+          last_size = mem->ty->size;
+        }
+        // Not equals both sizes.
+        if (!equals_node(ty->size, ty->origin_size)) {
+          if (ty->size->kind != ND_NUM || last_size->kind != ND_NUM)
+            error_tok(ty->name, "Could not adjust on alignment this type.");
+          else if (last_offset->kind == ND_NUM) {
+            int64_t pad_start = last_offset->val + last_size->val;
+            int64_t pad_size = ty->size->val - pad_start;
+            println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
+          } else
+            unreachable();
         }
         break;
+      }
       case TY_UNION:
         println(".structure public %s explicit", to_cil_typename(ty));
-        for (Member *mem = ty->members; mem; mem = mem->next) {
+        for (Member *mem = ty->members; mem; mem = mem->next)
           println("  public %s %s 0", to_cil_typename(mem->ty), get_string(mem->name));
+        // Not equals both sizes.
+        if (!equals_node(ty->size, ty->origin_size)) {
+          if (ty->size->kind != ND_NUM)
+            error_tok(ty->name, "Could not adjust on alignment this type.");
+          else
+            println("  internal uint8[%ld] $pad_$0 0", ty->size->val);
         }
         break;
     }
