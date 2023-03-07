@@ -864,8 +864,6 @@ static void emit_text(Obj *prog) {
     
     for (Obj *var = fn->params; var; var = var->next)
       print(" %s:%s", var->name, to_cil_typename(var->ty));
-    if (fn->ty->is_variadic)
-      print(" ...");
 
     println("");
     current_fn = fn;
