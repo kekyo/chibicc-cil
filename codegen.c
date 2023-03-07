@@ -475,7 +475,16 @@ static void gen_expr(Node *node, bool will_discard) {
   case ND_FUNCALL:
     for (Node *arg = node->args; arg; arg = arg->next)
       gen_expr(arg, false);
-    println("  call %s", node->funcname);
+    print("  call %s", node->funcname);
+    if (node->func_ty->is_variadic) {
+      for (Node *arg = node->args; arg; arg = arg->next) {
+        if (arg->ty->kind == TY_ARRAY)
+          print(" %s", to_cil_typename(pointer_to(arg->ty->base, arg->tok)));
+        else
+          print(" %s", to_cil_typename(arg->ty));
+      }
+    }
+    println("");
     if (will_discard) {
       if (node->ty->kind != TY_VOID)
         println("  pop");
