@@ -2219,7 +2219,7 @@ static Node *primary(Token **rest, Token *tok) {
   }
 
   if (tok->kind == TK_NUM) {
-    Node *node = new_num(tok->val, tok);
+    Node *node = new_typed_num(tok->val, tok->ty, tok);
     *rest = tok->next;
     return node;
   }
