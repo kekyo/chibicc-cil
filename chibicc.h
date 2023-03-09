@@ -228,6 +228,7 @@ typedef enum {
   TY_ARRAY,
   TY_STRUCT,
   TY_UNION,
+  TY_VA_LIST,
 } TypeKind;
 
 struct Type {
@@ -303,6 +304,7 @@ Type *func_type(Type *return_ty);
 Type *array_of(Type *base, int size);
 Type *enum_type(void);
 Type *struct_type(void);
+Type *va_list_type(void);
 void add_type(Node *node);
 
 //

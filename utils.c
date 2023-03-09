@@ -119,6 +119,7 @@ bool equals_type(Type *lhs, Type *rhs) {
     case TY_SHORT:
     case TY_INT:
     case TY_LONG:
+    case TY_VA_LIST:
       return true;
     case TY_ENUM:
     case TY_STRUCT:
@@ -224,9 +225,9 @@ static bool is_immutable(Node *node) {
       return is_immutable(node->cond) && is_immutable(node->then) && is_immutable(node->els);
     case ND_MEMBER:
     case ND_VAR:
+    case ND_MEMZERO:
       return false;
     case ND_NUM:
-    case ND_MEMZERO:
     case ND_SIZEOF:
     case ND_NULL_EXPR:
       return true;

@@ -3,6 +3,7 @@
 static Node size0_node = {ND_NUM, 0};
 static Node size1_node = {ND_NUM, 1};
 static Node size4_node = {ND_NUM, 4};
+static Node size8_node = {ND_NUM, 8};
 
 Type *ty_void = &(Type){TY_VOID, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
 Type *ty_bool = &(Type){TY_BOOL, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
@@ -66,6 +67,13 @@ Type *struct_type(void) {
   Type *ty = new_type(TY_STRUCT);
   ty->align = &size1_node;
   ty->size = &size0_node;
+  return ty;
+}
+
+Type *va_list_type(void) {
+  Type *ty = new_type(TY_VA_LIST);
+  ty->align = &size8_node;   // TODO:
+  ty->size = new_sizeof(ty, NULL);
   return ty;
 }
 
@@ -185,7 +193,6 @@ void add_type(Node *node) {
       error_tok(node->tok, "invalid pointer dereference");
     if (node->lhs->ty->base->kind == TY_VOID)
       error_tok(node->tok, "dereferencing a void pointer");
-
     node->ty = node->lhs->ty->base;
     return;
   case ND_STMT_EXPR:

@@ -371,7 +371,7 @@ static void push_tag_scope(Token *tok, Type *ty) {
   scope->tags = sc;
 }
 
-// declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
+// declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long" | "__builtin_va_list"
 //             | "typedef" | "static" | "extern"
 //             | struct-decl | union-decl | typedef-name
 //             | enum-specifier)+
@@ -435,6 +435,14 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
         attr->align = new_num(const_expr(&tok, tok), tok);
       tok = skip(tok, ")");
       continue;
+    }
+
+    if (equal(tok, "__builtin_va_list")) {
+      if (counter)
+        break;
+      ty = va_list_type();
+      tok = tok->next;
+      break;
     }
 
     // Handle user-defined types.
@@ -1039,7 +1047,7 @@ static void gvar_initializer(Token **rest, Token *tok, Obj *var) {
 static bool is_typename(Token *tok) {
   static char *kw[] = {
     "void", "_Bool", "char", "short", "int", "long", "struct", "union",
-    "typedef", "enum", "static", "extern", "_Alignas",
+    "typedef", "enum", "static", "extern", "_Alignas", "__builtin_va_list"
   };
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
@@ -2064,8 +2072,9 @@ static Node *funcall(Token **rest, Token *tok) {
     add_type(arg);
 
     if (param_ty) {
-      if (param_ty->kind == TY_STRUCT || param_ty->kind == TY_UNION)
-        error_tok(arg->tok, "passing struct or union is not supported yet");
+//    CLR and chibias already have capability.
+//    if (param_ty->kind == TY_STRUCT || param_ty->kind == TY_UNION)
+//      error_tok(arg->tok, "passing struct or union is not supported yet");
       arg = new_cast(arg, param_ty);
       param_ty = param_ty->next;
     }

@@ -86,12 +86,8 @@ public static class text
         return buffer.Count;
     }
 
-    public static unsafe int sprintf(sbyte* buf, sbyte* fmt, __arglist)
+    public static unsafe int vsprintf(sbyte* buf, sbyte* fmt, ArgIterator ap)
     {
-        // va_list ap;
-        // va_start(ap, fmt);
-        var ap = new ArgIterator(__arglist);
-
         var p = (byte*)buf;
         var len = 0;
         vwrprintf((byte*)fmt, ap, v =>
@@ -100,9 +96,16 @@ public static class text
             p++;
             len++;
         });
-
-        // va_end(ap);
+        *p = 0;
         return len;
+    }
+
+    public static unsafe int sprintf(sbyte* buf, sbyte* fmt, __arglist)
+    {
+        // va_list ap;
+        // va_start(ap, fmt);
+        var ap = new ArgIterator(__arglist);
+        return vsprintf(buf, fmt, ap);
     }
 
     public static unsafe int memcmp(sbyte* p, sbyte* q, long n)
@@ -152,15 +155,5 @@ public static class text
         }
         Console.WriteLine("{0} => {1} expected but got {2}", Marshal.PtrToStringAnsi((IntPtr)code), expected, actual);
         Environment.Exit(1);
-    }
-
-    public static unsafe int add_all(int n, __arglist)
-    {
-        var ap = new ArgIterator(__arglist);
-
-        var sum = 0;
-        for (var i = 0; i < n; i++)
-            sum += __refvalue(ap.GetNextArg(), int);
-        return sum;
     }
 }

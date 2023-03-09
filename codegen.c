@@ -99,6 +99,8 @@ static const char *to_cil_typename(Type *ty) {
         return format("%s_%p", get_string(ty->tag), ty);
       else
         return format("tag_%p", ty);
+    case TY_VA_LIST:
+      return "System.ArgIterator";
   }
   unreachable();
 }
@@ -165,6 +167,7 @@ static void load(Type *ty) {
       return;
     case TY_STRUCT:
     case TY_UNION:
+    case TY_VA_LIST:
       println("  ldobj %s", to_cil_typename(ty));
       return;
     case TY_PTR:
@@ -195,6 +198,7 @@ static void store(Type *ty) {
   switch (ty->kind) {
     case TY_STRUCT:
     case TY_UNION:
+    case TY_VA_LIST:
       println("  stobj %s", to_cil_typename(ty));
       return;
     case TY_PTR:
@@ -276,6 +280,84 @@ static void cast(Type *from, Type *to) {
   int t2 = getTypeId(to);
   if (cast_table[t1][t2])
     println("  %s", cast_table[t1][t2]);
+}
+
+static void gen_funcall(Node *node, bool will_discard) {
+  // Special case: __builtin_va_start(&ap, arg)
+  if (strcmp(node->funcname, "__builtin_va_start") == 0) {
+    if (!node->args)
+      error_tok(node->tok, "invalid argument");
+    else {
+      gen_expr(node->args, false);
+      println("  arglist");
+      println("  call System.ArgIterator..ctor System.RuntimeArgumentHandle");
+    }
+    return;
+  }
+
+  // Special case: __builtin_va_arg(&ap, (int*)0)
+  if (strcmp(node->funcname, "__builtin_va_arg") == 0) {
+    // &ap
+    Node *arg = node->args;
+    if (!arg)
+      error_tok(node->tok, "invalid argument");
+    gen_expr(arg, false);
+    if (!arg->next)
+      error_tok(arg->tok, "invalid argument");
+    // (int*)0
+    Node *typename_expr = arg->next;
+    if (typename_expr->kind != ND_CAST || typename_expr->ty->kind != TY_PTR)
+      error_tok(arg->tok, "invalid argument");
+    // 0
+    if (typename_expr->ty->base->kind != TY_INT || typename_expr->lhs->kind != ND_NUM || typename_expr->lhs->val != 0)
+      error_tok(arg->tok, "invalid argument");
+
+    println("  call System.ArgIterator.GetNextArg");
+    if (!will_discard) {
+      // int
+      Type *typename_ty = typename_expr->ty->base;
+      println("  refanyval %s", to_cil_typename(typename_ty));
+    }
+    else
+      println("  pop");
+
+    // Avoid casting at parent.
+    node->ty = typename_expr->ty;
+    return;
+  }
+
+  for (Node *arg = node->args; arg; arg = arg->next)
+    gen_expr(arg, false);
+  print("  call %s", node->funcname);
+  if (node->func_ty->is_variadic) {
+    for (Node *arg = node->args; arg; arg = arg->next) {
+      if (arg->ty->kind == TY_ARRAY)
+        print(" %s", to_cil_typename(pointer_to(arg->ty->base, arg->tok)));
+      else
+        print(" %s", to_cil_typename(arg->ty));
+    }
+  }
+  println("");
+  if (will_discard) {
+    if (node->ty->kind != TY_VOID)
+      println("  pop");
+  } else {
+    switch (node->ty->kind) {
+    case TY_BOOL:
+      println("  conv.i1");
+      println("  ldc.i4.0");
+      println("  ceq");
+      println("  ldc.i4.0");
+      println("  ceq");
+      return;
+    case TY_CHAR:
+      println("  conv.i1");
+      return;
+    case TY_SHORT:
+      println("  conv.i2");
+      return;
+    }
+  }
 }
 
 // If will_discard is true, the result must be discarded.
@@ -473,38 +555,7 @@ static void gen_expr(Node *node, bool will_discard) {
     return;
   }
   case ND_FUNCALL:
-    for (Node *arg = node->args; arg; arg = arg->next)
-      gen_expr(arg, false);
-    print("  call %s", node->funcname);
-    if (node->func_ty->is_variadic) {
-      for (Node *arg = node->args; arg; arg = arg->next) {
-        if (arg->ty->kind == TY_ARRAY)
-          print(" %s", to_cil_typename(pointer_to(arg->ty->base, arg->tok)));
-        else
-          print(" %s", to_cil_typename(arg->ty));
-      }
-    }
-    println("");
-    if (will_discard) {
-      if (node->ty->kind != TY_VOID)
-        println("  pop");
-    } else {
-      switch (node->ty->kind) {
-      case TY_BOOL:
-        println("  conv.i1");
-        println("  ldc.i4.0");
-        println("  ceq");
-        println("  ldc.i4.0");
-        println("  ceq");
-        return;
-      case TY_CHAR:
-        println("  conv.i1");
-        return;
-      case TY_SHORT:
-        println("  conv.i2");
-        return;
-      }
-    }
+    gen_funcall(node, will_discard);
     return;
   }
 
@@ -811,9 +862,11 @@ static void emit_text(Obj *prog) {
     else
       print(".function public %s %s", to_cil_typename(fn->ty->return_ty), fn->name);
     
-    for (Obj *var = fn->params; var; var = var->next) {
+    for (Obj *var = fn->params; var; var = var->next)
       print(" %s:%s", var->name, to_cil_typename(var->ty));
-    }
+    if (fn->ty->is_variadic)
+      print(" ...");
+
     println("");
     current_fn = fn;
 
