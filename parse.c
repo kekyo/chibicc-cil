@@ -1719,7 +1719,8 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
   if (lhs->ty->base && rhs->ty->base) {
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node = new_binary(ND_DIV, node, lhs->ty->base->size, tok);
-    node = new_cast(node, ty_long);
+    add_type(node);
+    node->ty = ty_nint;   // Forced ptrdiff_t
     return node;
   }
 
@@ -1935,8 +1936,8 @@ static Type *struct_decl(Token **rest, Token *tok) {
     return ty;
 
   // Assign offsets within the struct to members.
-  Node *node0 = new_typed_num(0, ty_nint, tok);
-  Node *node1 = new_typed_num(1, ty_nint, tok);
+  Node *node0 = new_typed_num(0, ty_nuint, tok);   // (size_t)0
+  Node *node1 = new_typed_num(1, ty_nuint, tok);   // (size_t)1
   Node *offset = node0;
   Node *align = node1;
   Node *origin_align = node1;
@@ -1977,8 +1978,8 @@ static Type *union_decl(Token **rest, Token *tok) {
     return ty;
 
   // We need to compute the alignment and the size though.
-  Node *node0 = new_typed_num(0, ty_nint, tok);
-  Node *node1 = new_typed_num(1, ty_nint, tok);
+  Node *node0 = new_typed_num(0, ty_nuint, tok);   // (size_t)0
+  Node *node1 = new_typed_num(1, ty_nuint, tok);   // (size_t)1
   Node *size = node0;
   Node *align = node1;
   Node *origin_align = node1;

@@ -81,6 +81,7 @@ Type *copy_type(Type *ty) {
 Type *pointer_to(Type *base, Token *tok) {
   Type *ty = new_type(TY_PTR);
   ty->base = base;
+  ty->is_unsigned = true;
   Node *size = new_sizeof(ty, tok);
   ty->size = size;
   ty->align = size;
