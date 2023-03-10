@@ -1711,17 +1711,16 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
   // ptr - num
   if (lhs->ty->base && is_integer(rhs->ty)) {
     rhs = new_binary(ND_MUL, rhs, lhs->ty->base->size, tok);
-    add_type(rhs);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
-    node->ty = lhs->ty;
     return node;
   }
 
   // ptr - ptr, which returns how many elements are between the two.
   if (lhs->ty->base && rhs->ty->base) {
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
-    node->ty = ty_int;
-    return new_binary(ND_DIV, node, lhs->ty->base->size, tok);
+    node = new_binary(ND_DIV, node, lhs->ty->base->size, tok);
+    node = new_cast(node, ty_long);
+    return node;
   }
 
   error_tok(tok, "invalid operands");
@@ -1936,8 +1935,8 @@ static Type *struct_decl(Token **rest, Token *tok) {
     return ty;
 
   // Assign offsets within the struct to members.
-  Node *node0 = new_num(0, tok);
-  Node *node1 = new_num(1, tok);
+  Node *node0 = new_typed_num(0, ty_nint, tok);
+  Node *node1 = new_typed_num(1, ty_nint, tok);
   Node *offset = node0;
   Node *align = node1;
   Node *origin_align = node1;
@@ -1978,8 +1977,8 @@ static Type *union_decl(Token **rest, Token *tok) {
     return ty;
 
   // We need to compute the alignment and the size though.
-  Node *node0 = new_num(0, tok);
-  Node *node1 = new_num(1, tok);
+  Node *node0 = new_typed_num(0, ty_nint, tok);
+  Node *node1 = new_typed_num(1, ty_nint, tok);
   Node *size = node0;
   Node *align = node1;
   Node *origin_align = node1;

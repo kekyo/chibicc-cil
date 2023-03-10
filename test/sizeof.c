@@ -85,6 +85,9 @@ int main() {
   ASSERT(getptrsize(), sizeof(uintptr_t));
   ASSERT(getptrsize(), sizeof(size_t));
 
+  ASSERT(1, sizeof(char) << 31 >> 31);
+  ASSERT(1, sizeof(char) << 63 >> 63);
+
   printf("OK\n");
   return 0;
 }
