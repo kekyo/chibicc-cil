@@ -24,6 +24,9 @@ Type *ty_ulong = &(Type){TY_LONG};
 Type *ty_nint = &(Type){TY_NINT};
 Type *ty_nuint = &(Type){TY_NINT};
 
+Type *ty_float = &(Type){TY_FLOAT};
+Type *ty_double = &(Type){TY_DOUBLE};
+
 static void init_type(Type *ty, Node *sz, bool is_unsigned) {
   ty->size = sz;
   ty->align = sz;
@@ -58,6 +61,9 @@ void init_type_system() {
 
   init_type(ty_nint, sizenint_node, false);
   init_type(ty_nuint, sizenuint_node, true);
+
+  init_type(ty_float, size4_node, false);
+  init_type(ty_double, size8_node, false);
 }
 
 static Type *new_type(TypeKind kind) {
@@ -70,6 +76,10 @@ bool is_integer(Type *ty) {
   TypeKind k = ty->kind;
   return k == TY_BOOL || k == TY_CHAR || k == TY_SHORT ||
          k == TY_INT  || k == TY_LONG || k == TY_NINT || k == TY_ENUM;
+}
+
+bool is_flonum(Type *ty) {
+  return ty->kind == TY_FLOAT || ty->kind == TY_DOUBLE;
 }
 
 Type *copy_type(Type *ty) {

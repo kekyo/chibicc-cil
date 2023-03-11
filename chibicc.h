@@ -44,6 +44,7 @@ struct Token {
   TokenKind kind; // Token kind
   Token *next;    // Next token
   int64_t val;    // If kind is TK_NUM, its value
+  double fval;    // If kind is TK_NUM, its value
   char *loc;      // Token location
   int len;        // Token length
   Type *ty;       // Used if TK_NUM or TK_STR
@@ -154,8 +155,11 @@ typedef enum {
 // AST node type
 struct Node {
   NodeKind kind; // Node kind
+
   // Numeric literal
   int64_t val;
+  double fval;
+
   Node *next;    // Next node
   Type *ty;      // Type, e.g. int or pointer to int
   Token *tok;    // Representative token
@@ -224,6 +228,8 @@ typedef enum {
   TY_INT,
   TY_LONG,
   TY_NINT,
+  TY_FLOAT,
+  TY_DOUBLE,
   TY_ENUM,
   TY_PTR,
   TY_FUNC,
@@ -309,9 +315,13 @@ extern Type *ty_ulong;
 extern Type *ty_nint;
 extern Type *ty_nuint;
 
+extern Type *ty_float;
+extern Type *ty_double;
+
 void init_type_system();
 
 bool is_integer(Type *ty);
+bool is_flonum(Type *ty);
 Type *copy_type(Type *ty);
 Type *pointer_to(Type *base, Token *tok);
 Type *func_type(Type *return_ty);

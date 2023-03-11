@@ -436,6 +436,12 @@ static void gen_expr(Node *node, bool will_discard) {
           println("  ldc.i8 %ld", node->val);
           println("  conv.i");
           return;
+        case TY_FLOAT:
+          println("  ldc.r4 %f", node->fval);
+          return;
+        case TY_DOUBLE:
+          println("  ldc.r8 %f", node->fval);
+          return;
       }
       unreachable();
     }

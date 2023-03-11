@@ -2269,7 +2269,15 @@ static Node *primary(Token **rest, Token *tok) {
   }
 
   if (tok->kind == TK_NUM) {
-    Node *node = new_typed_num(tok->val, tok->ty, tok);
+    Node *node;
+    if (is_flonum(tok->ty)) {
+      node = new_node(ND_NUM, tok);
+      node->fval = tok->fval;
+      node->ty = tok->ty;
+    } else {
+      node = new_typed_num(tok->val, tok->ty, tok);
+    }
+
     *rest = tok->next;
     return node;
   }
