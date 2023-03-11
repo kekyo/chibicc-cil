@@ -158,6 +158,11 @@ static Type *get_common_type(Type *ty1, Type *ty2, Token *tok) {
   if (ty1->base)
     return pointer_to(ty1->base, tok);
 
+  if (ty1->kind == TY_DOUBLE || ty2->kind == TY_DOUBLE)
+    return ty_double;
+  if (ty1->kind == TY_FLOAT || ty2->kind == TY_FLOAT)
+    return ty_float;
+
   int comp1 = get_type_comparer(ty1);
   int comp2 = get_type_comparer(ty2);
 

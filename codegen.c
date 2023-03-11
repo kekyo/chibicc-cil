@@ -704,7 +704,7 @@ static void gen_expr(Node *node, bool will_discard) {
       println("  clt");
     return;
   case ND_LE:
-    if (node->lhs->ty->is_unsigned)
+    if (node->lhs->ty->is_unsigned || is_flonum(node->lhs->ty))
       println("  cgt.un");
     else
       println("  cgt");
