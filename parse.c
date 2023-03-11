@@ -139,27 +139,27 @@ static Type *find_tag(Token *tok) {
   return NULL;
 }
 
-static Node *new_node(NodeKind kind, Token *tok) {
+Node *new_node(NodeKind kind, Token *tok) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
   node->tok = tok;
   return node;
 }
 
-static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok) {
+Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok) {
   Node *node = new_node(kind, tok);
   node->lhs = lhs;
   node->rhs = rhs;
   return node;
 }
 
-static Node *new_unary(NodeKind kind, Node *expr, Token *tok) {
+Node *new_unary(NodeKind kind, Node *expr, Token *tok) {
   Node *node = new_node(kind, tok);
   node->lhs = expr;
   return node;
 }
 
-static Node *new_num(int64_t val, Token *tok) {
+Node *new_num(int64_t val, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->val = val;
   return node;
@@ -1315,92 +1315,6 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
 
   *rest = tok->next;
   ty->members = head.next;
-}
-
-// Evaluate a given node as a constant expression.
-static Node *reduce(Node *node) {
-  add_type(node);
-
-  Node *lhs;
-  Node *rhs;
-  Node *cond;
-  switch (node->kind) {
-  case ND_ADD:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val + rhs->val, node->tok);
-    else
-      return new_binary(ND_ADD, lhs, rhs, node->tok);
-  case ND_SUB:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val - rhs->val, node->tok);
-    else
-      return new_binary(ND_SUB, lhs, rhs, node->tok);
-  case ND_MUL:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val * rhs->val, node->tok);
-    else
-      return new_binary(ND_MUL, lhs, rhs, node->tok);
-  case ND_DIV:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val / rhs->val, node->tok);
-    else
-      return new_binary(ND_DIV, lhs, rhs, node->tok);
-  case ND_NEG:
-    lhs = reduce(node->lhs);
-    if (lhs->kind == ND_NUM)
-      return new_num(-lhs->val, node->tok);
-    else
-      return new_unary(ND_NEG, lhs, node->tok);
-  case ND_EQ:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val == rhs->val ? 1 : 0, node->tok);
-    else
-      return new_binary(ND_EQ, lhs, rhs, node->tok);
-  case ND_NE:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val != rhs->val ? 1 : 0, node->tok);
-    else
-      return new_binary(ND_NE, lhs, rhs, node->tok);
-  case ND_LT:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val < rhs->val ? 1 : 0, node->tok);
-    else
-      return new_binary(ND_LT, lhs, rhs, node->tok);
-  case ND_LE:
-    lhs = reduce(node->lhs);
-    rhs = reduce(node->rhs);
-    if (lhs->kind == ND_NUM && rhs->kind == ND_NUM)
-      return new_num(lhs->val <= rhs->val ? 1 : 0, node->tok);
-    else
-      return new_binary(ND_LE, lhs, rhs, node->tok);
-  case ND_COND:
-    cond = reduce(node->cond);
-    if (cond->kind == ND_NUM)
-      return cond->val ? reduce(node->then) : reduce(node->els);
-    else {
-      Node *ncond = new_node(node->kind, node->tok);
-      ncond->cond = cond;
-      ncond->then = reduce(node->then);
-      ncond->els = reduce(node->els);
-      return ncond;
-    }
-  }
-
-  return node;
 }
 
 static Node *align_to_node(Node *n, Node *align, Token *tok) {
