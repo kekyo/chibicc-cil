@@ -248,9 +248,9 @@ static void store(Type *ty) {
   unreachable();
 }
 
-static void gen_comp_val(Type *comp_ty) {
+static void cmp_zero(Type *ty) {
   println("  ldc.i4.0");
-  switch (comp_ty->kind) {
+  switch (ty->kind) {
     case TY_LONG:
       println("  conv.i8");
       break;
@@ -265,6 +265,7 @@ static void gen_comp_val(Type *comp_ty) {
       println("  conv.r8");
       break;
   }
+  println("  ceq");
 }
 
 typedef enum { I8, I16, I32, I64, NINT, U8, U16, U32, U64, NUINT, F32, F64 } TypeId;
@@ -334,8 +335,7 @@ static void cast(Type *from, Type *to) {
     return;
 
   if (to->kind == TY_BOOL) {
-    gen_comp_val(from);
-    println("  ceq");
+    cmp_zero(from);
     println("  ldc.i4.0");
     println("  ceq");
     return;
@@ -580,8 +580,8 @@ static void gen_expr(Node *node, bool will_discard) {
   case ND_COND: {
     int c = count();
     gen_expr(node->cond, false);
-    gen_comp_val(node->cond->ty);
-    println("  beq _L_else_%d", c);
+    cmp_zero(node->cond->ty);
+    println("  brtrue _L_else_%d", c);
     gen_expr(node->then, will_discard);
     println("  br _L_end_%d", c);
     println("_L_else_%d:", c);
@@ -591,10 +591,8 @@ static void gen_expr(Node *node, bool will_discard) {
   }
   case ND_NOT:
     gen_expr(node->lhs, will_discard);
-    if (!will_discard) {
-      gen_comp_val(node->lhs->ty);
-      println("  ceq");
-    }
+    if (!will_discard)
+      cmp_zero(node->lhs->ty);
     return;
   case ND_BITNOT:
     gen_expr(node->lhs, will_discard);
@@ -605,11 +603,11 @@ static void gen_expr(Node *node, bool will_discard) {
     int c = count();
     if (!will_discard) {
       gen_expr(node->lhs, false);
-      gen_comp_val(node->lhs->ty);
-      println("  beq.s _L_false_%d", c);
+      cmp_zero(node->lhs->ty);
+      println("  brtrue.s _L_false_%d", c);
       gen_expr(node->rhs, false);
-      gen_comp_val(node->rhs->ty);
-      println("  beq.s _L_false_%d", c);
+      cmp_zero(node->rhs->ty);
+      println("  brtrue.s _L_false_%d", c);
       println("  ldc.i4.1");
       println("  br.s _L_end_%d", c);
       println("_L_false_%d:", c);
@@ -617,8 +615,8 @@ static void gen_expr(Node *node, bool will_discard) {
       println("_L_end_%d:", c);
     } else {
       gen_expr(node->lhs, false);
-      gen_comp_val(node->lhs->ty);
-      println("  beq.s _L_end_%d", c);
+      cmp_zero(node->lhs->ty);
+      println("  brtrue.s _L_end_%d", c);
       gen_expr(node->rhs, true);
       println("_L_end_%d:", c);
     }
@@ -628,11 +626,11 @@ static void gen_expr(Node *node, bool will_discard) {
     int c = count();
     if (!will_discard) {
       gen_expr(node->lhs, false);
-      gen_comp_val(node->lhs->ty);
-      println("  bne.un.s _L_true_%d", c);
+      cmp_zero(node->lhs->ty);
+      println("  brfalse.s _L_true_%d", c);
       gen_expr(node->rhs, false);
-      gen_comp_val(node->rhs->ty);
-      println("  bne.un.s _L_true_%d", c);
+      cmp_zero(node->rhs->ty);
+      println("  brfalse.s _L_true_%d", c);
       println("  ldc.i4.0");
       println("  br.s _L_end_%d", c);
       println("_L_true_%d:", c);
@@ -640,8 +638,8 @@ static void gen_expr(Node *node, bool will_discard) {
       println("_L_end_%d:", c);
     } else {
       gen_expr(node->lhs, false);
-      gen_comp_val(node->lhs->ty);
-      println("  bne.un.s _L_end_%d", c);
+      cmp_zero(node->lhs->ty);
+      println("  brfalse.s _L_end_%d", c);
       gen_expr(node->rhs, true);
       println("_L_end_%d:", c);
     }
@@ -738,7 +736,8 @@ static bool gen_stmt(Node *node) {
   case ND_IF: {
     int c = count();
     gen_expr(node->cond, false);
-    println("  brfalse _L_else_%d", c);
+    cmp_zero(node->cond->ty);
+    println("  brtrue _L_else_%d", c);
     if (gen_stmt(node->then))
       println("  br _L_end_%d", c);
     println("_L_else_%d:", c);
@@ -756,7 +755,8 @@ static bool gen_stmt(Node *node) {
     println("_L_begin_%d:", c);
     if (node->cond) {
       gen_expr(node->cond, false);
-      println("  brfalse %s", node->brk_label);
+      cmp_zero(node->cond->ty);
+      println("  brtrue %s", node->brk_label);
     }
     bool req = gen_stmt(node->then);
     if (req || node->is_resolved_cont) {
@@ -775,7 +775,8 @@ static bool gen_stmt(Node *node) {
     if (req || node->is_resolved_cont) {
       println("%s:", node->cont_label);
       gen_expr(node->cond, false);
-      println("  brtrue _L_begin_%d", c);
+    cmp_zero(node->cond->ty);
+    println("  brfalse _L_begin_%d", c);
     }
     println("%s:", node->brk_label);
     return true;
