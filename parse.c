@@ -372,7 +372,9 @@ static void push_tag_scope(Token *tok, Type *ty) {
 //             | "typedef" | "static" | "extern"
 //             | "signed" | "unsigned"
 //             | struct-decl | union-decl | typedef-name
-//             | enum-specifier)+
+//             | enum-specifier
+//             | "const" | "volatile" | "auto" | "register" | "restrict"
+//             | "__restrict" | "__restrict__" | "_Noreturn")+
 //
 // The order of typenames in a type-specifier doesn't matter. For
 // example, `int long static` means the same as `static long int`.
@@ -423,6 +425,13 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
       tok = tok->next;
       continue;
     }
+
+    // These keywords are recognized but ignored.
+    if (consume(&tok, tok, "const") || consume(&tok, tok, "volatile") ||
+        consume(&tok, tok, "auto") || consume(&tok, tok, "register") ||
+        consume(&tok, tok, "restrict") || consume(&tok, tok, "__restrict") ||
+        consume(&tok, tok, "__restrict__") || consume(&tok, tok, "_Noreturn"))
+      continue;
 
     if (equal(tok, "_Alignas")) {
       if (!attr)
@@ -637,10 +646,21 @@ static Type *type_suffix(Token **rest, Token *tok, Type *ty) {
   return ty;
 }
 
-// declarator = "*"* ("(" ident ")" | "(" declarator ")" | ident) type-suffix
-static Type *declarator(Token **rest, Token *tok, Type *ty) {
-  while (consume(&tok, tok, "*"))
+// pointers = ("*" ("const" | "volatile" | "restrict")*)*
+static Type *pointers(Token **rest, Token *tok, Type *ty) {
+  while (consume(&tok, tok, "*")) {
     ty = pointer_to(ty, tok);
+    while (equal(tok, "const") || equal(tok, "volatile") || equal(tok, "restrict") ||
+           equal(tok, "__restrict") || equal(tok, "__restrict__"))
+      tok = tok->next;
+  }
+  *rest = tok;
+  return ty;
+}
+
+// declarator = pointers ("(" ident ")" | "(" declarator ")" | ident) type-suffix
+static Type *declarator(Token **rest, Token *tok, Type *ty) {
+  ty = pointers(&tok, tok, ty);
 
   if (equal(tok, "(")) {
     Token *start = tok;
@@ -658,12 +678,9 @@ static Type *declarator(Token **rest, Token *tok, Type *ty) {
   return ty;
 }
 
-// abstract-declarator = "*"* ("(" abstract-declarator ")")? type-suffix
+// abstract-declarator = pointers ("(" abstract-declarator ")")? type-suffix
 static Type *abstract_declarator(Token **rest, Token *tok, Type *ty) {
-  while (equal(tok, "*")) {
-    ty = pointer_to(ty, tok);
-    tok = tok->next;
-  }
+  ty = pointers(&tok, tok, ty);
 
   if (equal(tok, "(")) {
     Token *start = tok;
@@ -1098,6 +1115,8 @@ static bool is_typename(Token *tok) {
     "void", "_Bool", "char", "short", "int", "long", "struct", "union",
     "typedef", "enum", "static", "extern", "_Alignas", "__builtin_va_list", "signed", "unsigned",
     "__builtin_nint", "__builtin_nuint",
+    "const", "volatile", "auto", "register", "restrict", "__restrict",
+    "__restrict__", "_Noreturn",
   };
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
