@@ -88,7 +88,8 @@ static const char *to_cil_typename(Type *ty) {
       if (ty->array_len >= 1)
         return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
       else
-        return format("%s[0]", to_cil_typename(ty->base));
+        // Flexible array (0) / Unapplied size array (-1)
+        return format("%s[*]", to_cil_typename(ty->base));
     case TY_PTR:
       return format("%s*", to_cil_typename(ty->base));
     case TY_ENUM:
@@ -320,12 +321,24 @@ static void gen_expr(Node *node, bool will_discard) {
     return;
   case ND_SIZEOF:
     if (!will_discard) {
-      switch (node->ty->kind) {
-        case TY_ARRAY:
-          if (node->ty->array_len == 0) {
-            println("  ldc.i4.0");
+      switch (node->sizeof_ty->kind) {
+        case TY_STRUCT:
+          // Struct size with flexible array will be calculated invalid size by sizeof opcode.
+          if (node->sizeof_ty->is_flexible) {
+            aggregate_type(node->sizeof_ty);
+            gen_expr(node->sizeof_ty->size, false);
             return;
           }
+          break;
+        case TY_ARRAY:
+          // Flexible array will be calculated invalid size by sizeof opcode.
+          if (node->sizeof_ty->array_len == 0) {
+            aggregate_type(node->sizeof_ty);
+            println("  ldc.i4.0");
+            return;
+          } else if (node->sizeof_ty->array_len < 0)
+            unreachable();
+          break;
       }
       println("  sizeof %s", to_cil_typename(node->sizeof_ty));
       aggregate_type(node->sizeof_ty);

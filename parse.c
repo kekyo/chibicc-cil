@@ -546,6 +546,7 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
 static Type *array_dimensions(Token **rest, Token *tok, Type *ty) {
   if (equal(tok, "]")) {
     ty = type_suffix(rest, tok->next, ty);
+    // Unapplied size array (length=-1) when not update length later: `int(*)[][~]`
     return array_of(ty, -1);
   }
 
@@ -786,7 +787,10 @@ static void array_initializer1(Token **rest, Token *tok, Initializer *init) {
 static void array_initializer2(Token **rest, Token *tok, Initializer *init) {
   if (init->is_flexible) {
     int len = count_array_init_elements(tok, init->ty);
-    *init = *new_initializer(array_of(init->ty->base, len), false);
+    Type *array_ty = array_of(init->ty->base, len);
+    array_ty->size = reduce_node(array_ty->size);
+    array_ty->align = reduce_node(array_ty->align);
+    *init = *new_initializer(array_ty, false);
   }
 
   for (int i = 0; i < init->ty->array_len && !is_end(tok); i++) {
@@ -1748,6 +1752,7 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
   // called a "flexible array member". It should behave as if
   // if were a zero-sized array.
   if (cur != &head && cur->ty->kind == TY_ARRAY && cur->ty->array_len < 0) {
+    // Flexible array (length=0) 
     cur->ty = array_of(cur->ty->base, 0);
     ty->is_flexible = true;
   }
