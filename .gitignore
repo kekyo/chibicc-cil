@@ -6,6 +6,7 @@
 /tmp*
 /chibicc
 /test/*.exe
+/test/*.dll
 **/.vs/*
 **/.vscode/*
 **/.idea/*
