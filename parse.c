@@ -128,6 +128,7 @@ static int64_t eval(Node *node);
 static Node *assign(Token **rest, Token *tok);
 static Node *logor(Token **rest, Token *tok);
 static int64_t const_expr(Token **rest, Token *tok);
+static double eval_double(Node *node);
 static Node *conditional(Token **rest, Token *tok);
 static Node *logand(Token **rest, Token *tok);
 static Node *bitor(Token **rest, Token *tok);
@@ -201,6 +202,13 @@ Node *new_unary(NodeKind kind, Node *expr, Token *tok) {
 Node *new_num(int64_t val, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->val = val;
+  return node;
+}
+
+Node *new_flonum(double fval, Type *ty, Token *tok) {
+  Node *node = new_node(ND_NUM, tok);
+  node->fval = fval;
+  node->ty = ty;
   return node;
 }
 
@@ -1435,6 +1443,9 @@ static Node *expr(Token **rest, Token *tok) {
 static int64_t eval(Node *node) {
   add_type(node);
 
+  if (is_flonum(node->ty))
+    return eval_double(node);
+
   switch (node->kind) {
   case ND_ADD:
     return eval(node->lhs) + eval(node->rhs);
@@ -1516,6 +1527,41 @@ static int64_t eval(Node *node) {
 static int64_t const_expr(Token **rest, Token *tok) {
   Node *node = conditional(rest, tok);
   return eval(node);
+}
+
+static double eval_double(Node *node) {
+  add_type(node);
+
+  if (is_integer(node->ty)) {
+    if (node->ty->is_unsigned)
+      return (uint64_t)eval(node);
+    return eval(node);
+  }
+
+  switch (node->kind) {
+  case ND_ADD:
+    return eval_double(node->lhs) + eval_double(node->rhs);
+  case ND_SUB:
+    return eval_double(node->lhs) - eval_double(node->rhs);
+  case ND_MUL:
+    return eval_double(node->lhs) * eval_double(node->rhs);
+  case ND_DIV:
+    return eval_double(node->lhs) / eval_double(node->rhs);
+  case ND_NEG:
+    return -eval_double(node->lhs);
+  case ND_COND:
+    return eval_double(node->cond) ? eval_double(node->then) : eval_double(node->els);
+  case ND_COMMA:
+    return eval_double(node->rhs);
+  case ND_CAST:
+    if (is_flonum(node->lhs->ty))
+      return eval_double(node->lhs);
+    return eval(node->lhs);
+  case ND_NUM:
+    return node->fval;
+  }
+
+  error_tok(node->tok, "not a compile-time constant");
 }
 
 // Convert `A op= B` to `tmp = &A, *tmp = *tmp op B`
@@ -2286,13 +2332,10 @@ static Node *primary(Token **rest, Token *tok) {
 
   if (tok->kind == TK_NUM) {
     Node *node;
-    if (is_flonum(tok->ty)) {
-      node = new_node(ND_NUM, tok);
-      node->fval = tok->fval;
-      node->ty = tok->ty;
-    } else {
+    if (is_flonum(tok->ty))
+      node = new_flonum(tok->fval, tok->ty, tok);
+    else
       node = new_typed_num(tok->val, tok->ty, tok);
-    }
 
     *rest = tok->next;
     return node;

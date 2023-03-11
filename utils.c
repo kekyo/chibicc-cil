@@ -241,32 +241,71 @@ static bool is_immutable(Node *node) {
   }
 }
 
+static int64_t get_by_integer(Node *node) {
+  switch (node->ty->kind) {
+  case TY_BOOL:
+    return node->val ? 1 : 0;
+  case TY_CHAR:
+    return node->ty->is_unsigned ? (uint8_t)node->val : (int8_t)node->val;
+  case TY_SHORT:
+    return node->ty->is_unsigned ? (uint16_t)node->val : (int16_t)node->val;
+  case TY_INT:
+    return node->ty->is_unsigned ? (uint32_t)node->val : (int32_t)node->val;
+  case TY_ENUM:
+    return (int32_t)node->val;
+  case TY_LONG:
+    return node->ty->is_unsigned ? (uint64_t)node->val : node->val;
+  case TY_NINT:
+  case TY_PTR:
+    return node->ty->is_unsigned ? (uint64_t)(void *)node->val : (int64_t)(void *)node->val;
+  case TY_FLOAT:
+    return (int64_t)(float)node->fval;
+  case TY_DOUBLE:
+    return (int64_t)(double)node->fval;
+  }
+  unreachable();
+}
+
+static double get_by_flonum(Node *node) {
+  switch (node->ty->kind) {
+  case TY_BOOL:
+    return node->val ? 1.0 : 0.0;
+  case TY_CHAR:
+    return node->ty->is_unsigned ? (uint8_t)node->val : (int8_t)node->val;
+  case TY_SHORT:
+    return node->ty->is_unsigned ? (uint16_t)node->val : (int16_t)node->val;
+  case TY_INT:
+    return node->ty->is_unsigned ? (uint32_t)node->val : (int32_t)node->val;
+  case TY_ENUM:
+    return (int32_t)node->val;
+  case TY_LONG:
+    return node->ty->is_unsigned ? (uint64_t)node->val : node->val;
+  case TY_NINT:
+  case TY_PTR:
+    return node->ty->is_unsigned ? (uint64_t)(void *)node->val : (int64_t)(void *)node->val;
+  case TY_FLOAT:
+    return (float)node->fval;
+  case TY_DOUBLE:
+    return node->fval;
+  }
+  unreachable();
+}
+
 static Node *cast_type(Node *node, Type *ty) {
   if (node->kind == ND_NUM) {
     switch (ty->kind) {
     case TY_BOOL:
-      return new_typed_num(node->val ? 1 : 0, ty, node->tok);
     case TY_CHAR:
-      if (ty->is_unsigned)
-        return new_typed_num((uint8_t)node->val, ty, node->tok);
-      else
-        return new_typed_num((int8_t)node->val, ty, node->tok);
     case TY_SHORT:
-      if (ty->is_unsigned)
-        return new_typed_num((uint16_t)node->val, ty, node->tok);
-      else
-        return new_typed_num((int16_t)node->val, ty, node->tok);
     case TY_INT:
-      if (ty->is_unsigned)
-        return new_typed_num((uint32_t)node->val, ty, node->tok);
-      else
-        return new_typed_num((int32_t)node->val, ty, node->tok);
     case TY_ENUM:
-      return new_typed_num((int32_t)node->val, ty, node->tok);
     case TY_LONG:
     case TY_NINT:
     case TY_PTR:
-      return new_typed_num(node->val, ty, node->tok);
+      return new_typed_num(get_by_integer(node), ty, node->tok);
+    case TY_FLOAT:
+    case TY_DOUBLE:
+      return new_flonum(get_by_flonum(node), ty, node->tok);
     }
     unreachable();
   }
@@ -505,12 +544,9 @@ static Node *reduce(Node *node) {
   }
   case ND_SIZEOF: {
     int sz = calculate_size(node->sizeof_ty);
-    if (sz >= 0) {
-      Node *nnode = new_node(ND_NUM, node->tok);
-      nnode->val = sz;
-      nnode->ty = node->ty;
-      return nnode;
-    } else
+    if (sz >= 0)
+      return new_typed_num(sz, node->ty, node->tok);
+    else
       return node;
   }
   case ND_NUM:
@@ -522,60 +558,88 @@ static Node *reduce(Node *node) {
     unreachable();
   }
 
-  switch (node->kind) {
-  case ND_ADD:
-    return new_num(lhs->val + rhs->val, node->tok);
-  case ND_SUB:
-    return new_num(lhs->val - rhs->val, node->tok);
-  case ND_MUL:
-    return new_num(lhs->val * rhs->val, node->tok);
-  case ND_DIV:
-    if (node->ty->is_unsigned)
-      return new_num((uint64_t)lhs->val / rhs->val, node->tok);
-    else
-      return new_num(lhs->val / rhs->val, node->tok);
-  case ND_NEG:
-    return new_num(-lhs->val, node->tok);
-  case ND_MOD:
-    if (node->ty->is_unsigned)
-      return new_num((uint64_t)lhs->val % rhs->val, node->tok);
-    else
-      return new_num(lhs->val % rhs->val, node->tok);
-  case ND_BITAND:
-    return new_num(lhs->val & rhs->val, node->tok);
-  case ND_BITOR:
-    return new_num(lhs->val | rhs->val, node->tok);
-  case ND_BITXOR:
-    return new_num(lhs->val ^ rhs->val, node->tok);
-  case ND_SHL:
-    return new_num(lhs->val << rhs->val, node->tok);
-  case ND_SHR:
-    if (node->ty->is_unsigned)
-      return new_num((uint64_t)lhs->val >> rhs->val, node->tok);
-    else
-      return new_num(lhs->val >> rhs->val, node->tok);
-  case ND_EQ:
-    return new_num(lhs->val == rhs->val ? 1 : 0, node->tok);
-  case ND_NE:
-    return new_num(lhs->val != rhs->val ? 1 : 0, node->tok);
-  case ND_LT:
-    if (node->ty->is_unsigned)
-      return new_num((uint64_t)lhs->val < rhs->val ? 1 : 0, node->tok);
-    else
-      return new_num(lhs->val < rhs->val ? 1 : 0, node->tok);
-  case ND_LE:
-    if (node->ty->is_unsigned)
-      return new_num((uint64_t)lhs->val <= rhs->val ? 1 : 0, node->tok);
-    else
-      return new_num(lhs->val <= rhs->val ? 1 : 0, node->tok);
-  case ND_NOT:
-    return new_num(!lhs->val, node->tok);
-  case ND_BITNOT:
-    return new_num(~lhs->val, node->tok);
-  case ND_LOGAND:
-    return new_num(lhs->val && rhs->val, node->tok);
-  case ND_LOGOR:
-    return new_num(lhs->val || rhs->val, node->tok);
+  if (is_integer(node->ty))
+  {
+    switch (node->kind) {
+    case ND_ADD:
+      return new_typed_num(get_by_integer(lhs) + get_by_integer(rhs), node->ty, node->tok);
+    case ND_SUB:
+      return new_typed_num(get_by_integer(lhs) - get_by_integer(rhs), node->ty, node->tok);
+    case ND_MUL:
+      return new_typed_num(get_by_integer(lhs) * get_by_integer(rhs), node->ty, node->tok);
+    case ND_DIV:
+      if (node->ty->is_unsigned)
+        return new_typed_num((uint64_t)get_by_integer(lhs) / get_by_integer(rhs), node->ty, node->tok);
+      else
+        return new_typed_num(get_by_integer(lhs) / get_by_integer(rhs), node->ty, node->tok);
+    case ND_NEG:
+      return new_typed_num(-get_by_integer(lhs), node->ty, node->tok);
+    case ND_MOD:
+      if (node->ty->is_unsigned)
+        return new_typed_num((uint64_t)get_by_integer(lhs) % get_by_integer(rhs), node->ty, node->tok);
+      else
+        return new_typed_num(get_by_integer(lhs) % get_by_integer(rhs), node->ty, node->tok);
+    case ND_BITAND:
+      return new_typed_num(get_by_integer(lhs) & get_by_integer(rhs), node->ty, node->tok);
+    case ND_BITOR:
+      return new_typed_num(get_by_integer(lhs) | get_by_integer(rhs), node->ty, node->tok);
+    case ND_BITXOR:
+      return new_typed_num(get_by_integer(lhs) ^ get_by_integer(rhs), node->ty, node->tok);
+    case ND_SHL:
+      return new_typed_num(get_by_integer(lhs) << get_by_integer(rhs), node->ty, node->tok);
+    case ND_SHR:
+      if (node->ty->is_unsigned)
+        return new_typed_num((uint64_t)get_by_integer(lhs) >> get_by_integer(rhs), node->ty, node->tok);
+      else
+        return new_typed_num(get_by_integer(lhs) >> get_by_integer(rhs), node->ty, node->tok);
+    case ND_EQ:
+      return new_typed_num(get_by_integer(lhs) == get_by_integer(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_NE:
+      return new_typed_num(get_by_integer(lhs) != get_by_integer(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_LT:
+      if (node->ty->is_unsigned)
+        return new_typed_num((uint64_t)get_by_integer(lhs) < get_by_integer(rhs) ? 1 : 0, node->ty, node->tok);
+      else
+        return new_typed_num(get_by_integer(lhs) < get_by_integer(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_LE:
+      if (node->ty->is_unsigned)
+        return new_typed_num((uint64_t)get_by_integer(lhs) <= get_by_integer(rhs) ? 1 : 0, node->ty, node->tok);
+      else
+        return new_typed_num(get_by_integer(lhs) <= get_by_integer(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_NOT:
+      return new_typed_num(!get_by_integer(lhs), node->ty, node->tok);
+    case ND_BITNOT:
+      return new_typed_num(~get_by_integer(lhs), node->ty, node->tok);
+    case ND_LOGAND:
+      return new_typed_num(get_by_integer(lhs) && get_by_integer(rhs), node->ty, node->tok);
+    case ND_LOGOR:
+      return new_typed_num(get_by_integer(lhs) || get_by_integer(rhs), node->ty, node->tok);
+    }
+  } else {
+    switch (node->kind) {
+    case ND_ADD:
+      return new_flonum(get_by_flonum(lhs) + get_by_flonum(rhs), node->ty, node->tok);
+    case ND_SUB:
+      return new_flonum(get_by_flonum(lhs) - get_by_flonum(rhs), node->ty, node->tok);
+    case ND_MUL:
+      return new_flonum(get_by_flonum(lhs) * get_by_flonum(rhs), node->ty, node->tok);
+    case ND_DIV:
+      return new_flonum(get_by_flonum(lhs) / get_by_flonum(rhs), node->ty, node->tok);
+    case ND_NEG:
+      return new_flonum(-get_by_flonum(lhs), node->ty, node->tok);
+    case ND_MOD:
+      return new_flonum(get_by_integer(lhs) % get_by_integer(rhs), node->ty, node->tok);
+    case ND_EQ:
+      return new_flonum(get_by_flonum(lhs) == get_by_flonum(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_NE:
+      return new_flonum(get_by_flonum(lhs) != get_by_flonum(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_LT:
+      return new_flonum(get_by_flonum(lhs) < get_by_flonum(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_LE:
+      return new_flonum(get_by_flonum(lhs) <= get_by_flonum(rhs) ? 1 : 0, node->ty, node->tok);
+    case ND_NOT:
+      return new_flonum(!get_by_flonum(lhs), node->ty, node->tok);
+    }
   }
 
   unreachable();

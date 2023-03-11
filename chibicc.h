@@ -211,6 +211,7 @@ Node *new_node(NodeKind kind, Token *tok);
 Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok);
 Node *new_unary(NodeKind kind, Node *expr, Token *tok);
 Node *new_num(int64_t val, Token *tok);
+Node *new_flonum(double fval, Type *ty, Token *tok);
 Node *new_typed_num(int64_t val, Type *ty, Token *tok);
 Node *new_sizeof(Type *ty, Token *tok);
 Node *new_cast(Node *expr, Type *ty);
