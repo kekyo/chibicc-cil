@@ -86,6 +86,10 @@ static const char *to_cil_typename(Type *ty) {
       return ty->is_unsigned ? "uint64" : "int64";
     case TY_NINT:
       return ty->is_unsigned ? "nuint" : "nint";
+    case TY_FLOAT:
+      return "float32";
+    case TY_DOUBLE:
+      return "float64";
     case TY_ARRAY:
       if (ty->array_len >= 1)
         return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
@@ -185,6 +189,12 @@ static void load(Type *ty) {
     case TY_PTR:
       println("  ldind.i");
       return;
+    case TY_FLOAT:
+      println("  ldind.r4");
+      return;
+    case TY_DOUBLE:
+      println("  ldind.r8");
+      return;
   }
 
   char *insn = ty->is_unsigned ? "u" : "i";
@@ -228,6 +238,12 @@ static void store(Type *ty) {
     case TY_LONG:
       println("  stind.i8");
       return;
+    case TY_FLOAT:
+      println("  stind.r4");
+      return;
+    case TY_DOUBLE:
+      println("  stind.r8");
+      return;
   }
   unreachable();
 }
@@ -242,10 +258,16 @@ static void gen_comp_val(Type *comp_ty) {
     case TY_PTR:
       println("  conv.i");
       break;
+    case TY_FLOAT:
+      println("  conv.r4");
+      break;
+    case TY_DOUBLE:
+      println("  conv.r8");
+      break;
   }
 }
 
-typedef enum { I8, I16, I32, I64, NINT, U8, U16, U32, U64, NUINT } TypeId;
+typedef enum { I8, I16, I32, I64, NINT, U8, U16, U32, U64, NUINT, F32, F64 } TypeId;
 
 static TypeId getTypeId(Type *ty) {
   switch (ty->kind) {
@@ -264,6 +286,10 @@ static TypeId getTypeId(Type *ty) {
   case TY_NINT:
   case TY_PTR:
     return ty->is_unsigned ? NUINT : NINT;
+  case TY_FLOAT:
+    return F32;
+  case TY_DOUBLE:
+    return F64;
   }
   return NUINT;
 }
@@ -279,19 +305,24 @@ static char convi8[] = "conv.i8";
 static char convu8[] = "conv.u8";
 static char convnint[] = "conv.i";
 static char convnuint[] = "conv.u";
+static char convrun[] = "conv.r.un";
+static char convr4[] = "conv.r4";
+static char convr8[] = "conv.r8";
 
-static char *cast_table[][10] = {
-// to i8    i16     i32     i64     nint       u8      u16     u32     u64     nuint           // from
-  { NULL,   NULL,   NULL,   convi8, convnint,  NULL,   NULL,   NULL,   convi8, convnint  },    // i8
-  { convi1, NULL,   NULL,   convi8, convnint,  convu1, NULL,   NULL,   convi8, convnint  },    // i16
-  { convi1, convi2, NULL,   convi8, convnint,  convu1, convu2, NULL,   convi8, convnint  },    // i32
-  { convi1, convi2, convi4, NULL,   convnint,  convu1, convu2, convu4, NULL,   convnint  },    // i64
-  { convi1, convi2, convi4, convi8, NULL,      convu1, convu2, convu4, convi8, NULL      },    // nint
-  { NULL,   NULL,   NULL,   convu8, convnuint, NULL,   NULL,   NULL,   convu8, convnuint },    // u8
-  { convu1, NULL,   NULL,   convu8, convnuint, convu1, NULL,   NULL,   convu8, convnuint },    // u16
-  { convu1, convu2, NULL,   convu8, convnuint, convu1, convu2, NULL,   convu8, convnuint },    // u32
-  { convu1, convu2, convu4, NULL,   convnuint, convu1, convu2, convu4, NULL,   convnuint },    // u64
-  { convu1, convu2, convu4, convu8, NULL,      convu1, convu2, convu4, convu8, NULL      },    // nuint
+static char *cast_table[][12] = {
+// to i8    i16     i32     i64     nint       u8      u16     u32     u64     nuint      f32       f64             // from
+  { NULL,   NULL,   NULL,   convi8, convnint,  NULL,   NULL,   NULL,   convi8, convnint,  convr4,   convr8,  },    // i8
+  { convi1, NULL,   NULL,   convi8, convnint,  convu1, NULL,   NULL,   convi8, convnint,  convr4,   convr8,  },    // i16
+  { convi1, convi2, NULL,   convi8, convnint,  convu1, convu2, NULL,   convi8, convnint,  convr4,   convr8,  },    // i32
+  { convi1, convi2, convi4, NULL,   convnint,  convu1, convu2, convu4, NULL,   convnint,  convr4,   convr8,  },    // i64
+  { convi1, convi2, convi4, convi8, NULL,      convu1, convu2, convu4, convi8, NULL,      convr4,   convr8,  },    // nint
+  { NULL,   NULL,   NULL,   convu8, convnuint, NULL,   NULL,   NULL,   convu8, convnuint, convrun,  convrun, },    // u8
+  { convu1, NULL,   NULL,   convu8, convnuint, convu1, NULL,   NULL,   convu8, convnuint, convrun,  convrun, },    // u16
+  { convu1, convu2, NULL,   convu8, convnuint, convu1, convu2, NULL,   convu8, convnuint, convrun,  convrun, },    // u32
+  { convu1, convu2, convu4, NULL,   convnuint, convu1, convu2, convu4, NULL,   convnuint, convrun,  convrun, },    // u64
+  { convu1, convu2, convu4, convu8, NULL,      convu1, convu2, convu4, convu8, NULL,      convrun,  convrun, },    // nuint
+  { convi1, convi2, convi4, convi8, convnint,  convu1, convu2, convu4, convu8, convnuint, NULL,     convr8,  },    // f32
+  { convi1, convi2, convi4, convi8, convnint,  convu1, convu2, convu4, convu8, convnuint, convr4,   NULL,    },    // f64
 };
 
 static void cast(Type *from, Type *to) {
@@ -312,8 +343,12 @@ static void cast(Type *from, Type *to) {
 
   TypeId t1 = getTypeId(from);
   TypeId t2 = getTypeId(to);
-  if (cast_table[t1][t2])
-    println("  %s", cast_table[t1][t2]);
+  char *caster = cast_table[t1][t2];
+  if (caster) {
+    println("  %s", caster);
+    if (from->is_unsigned && to->kind == TY_DOUBLE)
+      println("  conv.r8");
+  }
 }
 
 static void gen_funcall(Node *node, bool will_discard) {
@@ -403,6 +438,12 @@ static void gen_funcall(Node *node, bool will_discard) {
       else
         println("  conv.i");
       return;
+    case TY_FLOAT:
+      println("  conv.r4");
+      return;
+    case TY_DOUBLE:
+      println("  conv.r8");
+      return;
     }
   }
 }
@@ -437,7 +478,7 @@ static void gen_expr(Node *node, bool will_discard) {
           println("  conv.i");
           return;
         case TY_FLOAT:
-          println("  ldc.r4 %f", node->fval);
+          println("  ldc.r4 %f", (float)node->fval);
           return;
         case TY_DOUBLE:
           println("  ldc.r8 %f", node->fval);
