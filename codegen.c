@@ -738,10 +738,18 @@ static bool gen_stmt(Node *node) {
     for (Node *n = node->case_next; n; n = n->case_next) {
       gen_addr(node);
       load(node->var->ty);
-      if (node->var->ty->kind == TY_LONG)
+      switch (node->cond->ty->kind) {
+      case TY_LONG:
         println("  ldc.i8 %ld", n->val);
-      else
-        println("  ldc.i4 %d", (int)n->val);
+        break;
+      case TY_NINT:
+        println("  ldc.i8 %ld", n->val);
+        println("  conv.i");
+        break;
+      default:
+        println("  ldc.i4 %d", (int32_t)n->val);
+        break;
+      }
       println("  beq %s", n->label);
     }
     if (node->default_case)

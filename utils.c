@@ -528,11 +528,17 @@ static Node *reduce(Node *node) {
   case ND_MUL:
     return new_num(lhs->val * rhs->val, node->tok);
   case ND_DIV:
-    return new_num(lhs->val / rhs->val, node->tok);
+    if (node->ty->is_unsigned)
+      return new_num((uint64_t)lhs->val / rhs->val, node->tok);
+    else
+      return new_num(lhs->val / rhs->val, node->tok);
   case ND_NEG:
     return new_num(-lhs->val, node->tok);
   case ND_MOD:
-    return new_num(lhs->val % rhs->val, node->tok);
+    if (node->ty->is_unsigned)
+      return new_num((uint64_t)lhs->val % rhs->val, node->tok);
+    else
+      return new_num(lhs->val % rhs->val, node->tok);
   case ND_BITAND:
     return new_num(lhs->val & rhs->val, node->tok);
   case ND_BITOR:
@@ -542,15 +548,24 @@ static Node *reduce(Node *node) {
   case ND_SHL:
     return new_num(lhs->val << rhs->val, node->tok);
   case ND_SHR:
-    return new_num(lhs->val >> rhs->val, node->tok);
+    if (node->ty->is_unsigned)
+      return new_num((uint64_t)lhs->val >> rhs->val, node->tok);
+    else
+      return new_num(lhs->val >> rhs->val, node->tok);
   case ND_EQ:
     return new_num(lhs->val == rhs->val ? 1 : 0, node->tok);
   case ND_NE:
     return new_num(lhs->val != rhs->val ? 1 : 0, node->tok);
   case ND_LT:
-    return new_num(lhs->val < rhs->val ? 1 : 0, node->tok);
+    if (node->ty->is_unsigned)
+      return new_num((uint64_t)lhs->val < rhs->val ? 1 : 0, node->tok);
+    else
+      return new_num(lhs->val < rhs->val ? 1 : 0, node->tok);
   case ND_LE:
-    return new_num(lhs->val <= rhs->val ? 1 : 0, node->tok);
+    if (node->ty->is_unsigned)
+      return new_num((uint64_t)lhs->val <= rhs->val ? 1 : 0, node->tok);
+    else
+      return new_num(lhs->val <= rhs->val ? 1 : 0, node->tok);
   case ND_NOT:
     return new_num(!lhs->val, node->tok);
   case ND_BITNOT:

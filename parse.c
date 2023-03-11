@@ -1400,10 +1400,14 @@ static int64_t eval(Node *node) {
   case ND_MUL:
     return eval(node->lhs) * eval(node->rhs);
   case ND_DIV:
+    if (node->ty->is_unsigned)
+      return (uint64_t)eval(node->lhs) / eval(node->rhs);
     return eval(node->lhs) / eval(node->rhs);
   case ND_NEG:
     return -eval(node->lhs);
   case ND_MOD:
+    if (node->ty->is_unsigned)
+      return (uint64_t)eval(node->lhs) % eval(node->rhs);
     return eval(node->lhs) % eval(node->rhs);
   case ND_BITAND:
     return eval(node->lhs) & eval(node->rhs);
@@ -1414,14 +1418,20 @@ static int64_t eval(Node *node) {
   case ND_SHL:
     return eval(node->lhs) << eval(node->rhs);
   case ND_SHR:
+    if (node->ty->is_unsigned)
+      return (uint64_t)eval(node->lhs) >> eval(node->rhs);
     return eval(node->lhs) >> eval(node->rhs);
   case ND_EQ:
     return eval(node->lhs) == eval(node->rhs);
   case ND_NE:
     return eval(node->lhs) != eval(node->rhs);
   case ND_LT:
+    if (node->lhs->ty->is_unsigned)
+      return (uint64_t)eval(node->lhs) < eval(node->rhs);
     return eval(node->lhs) < eval(node->rhs);
   case ND_LE:
+    if (node->lhs->ty->is_unsigned)
+      return (uint64_t)eval(node->lhs) <= eval(node->rhs);
     return eval(node->lhs) <= eval(node->rhs);
   case ND_COND:
     return eval(node->cond) ? eval(node->then) : eval(node->els);
@@ -1435,15 +1445,24 @@ static int64_t eval(Node *node) {
     return eval(node->lhs) && eval(node->rhs);
   case ND_LOGOR:
     return eval(node->lhs) || eval(node->rhs);
-  case ND_CAST:
+  case ND_CAST: {
+    int64_t val = eval(node->lhs);
     if (is_integer(node->ty)) {
       switch (node->ty->kind) {
-      case TY_CHAR: return (uint8_t)eval(node->lhs);
-      case TY_SHORT: return (uint16_t)eval(node->lhs);
-      case TY_INT: return (uint32_t)eval(node->lhs);
+      case TY_BOOL:
+        return val ? 1 : 0;
+      case TY_CHAR:
+        return node->ty->is_unsigned ? (uint8_t)val : (int8_t)val;
+      case TY_SHORT:
+        return node->ty->is_unsigned ? (uint16_t)val : (int16_t)val;
+      case TY_ENUM:
+        return (int32_t)val;
+      case TY_INT:
+        return node->ty->is_unsigned ? (uint32_t)val : (int32_t)val;
       }
     }
-    return eval(node->lhs);
+    return val;
+  }
   case ND_NUM:
     return node->val;
   }
