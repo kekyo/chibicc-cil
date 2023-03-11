@@ -49,6 +49,8 @@ static FILE *open_file(char *path) {
 int main(int argc, char **argv) {
   parse_args(argc, argv);
 
+  init_type_system();
+
   // Tokenize and parse.
   Token *tok = tokenize_file(input_path);
   Obj *prog = parse(tok);

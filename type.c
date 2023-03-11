@@ -1,17 +1,34 @@
 #include "chibicc.h"
 
-static Node size0_node = {ND_NUM, 0};
-static Node size1_node = {ND_NUM, 1};
-static Node size4_node = {ND_NUM, 4};
-static Node size8_node = {ND_NUM, 8};
+static Node *size0_node = &(Node){ND_NUM, 0};
+static Node *size1_node = &(Node){ND_NUM, 1};
+static Node *size2_node = &(Node){ND_NUM, 2};
+static Node *size4_node = &(Node){ND_NUM, 4};
+static Node *size8_node = &(Node){ND_NUM, 8};
 
-Type *ty_void = &(Type){TY_VOID, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
-Type *ty_bool = &(Type){TY_BOOL, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
+Type *ty_void = &(Type){TY_VOID};
+Type *ty_bool = &(Type){TY_BOOL};
 
-Type *ty_char = &(Type){TY_CHAR, &(Node){ND_NUM, 1}, &(Node){ND_NUM, 1}};
-Type *ty_short = &(Type){TY_SHORT, &(Node){ND_NUM, 2}, &(Node){ND_NUM, 2}};
-Type *ty_int = &(Type){TY_INT, &(Node){ND_NUM, 4}, &(Node){ND_NUM, 4}};
-Type *ty_long = &(Type){TY_LONG, &(Node){ND_NUM, 8}, &(Node){ND_NUM, 8}};
+Type *ty_char = &(Type){TY_CHAR};
+Type *ty_short = &(Type){TY_SHORT};
+Type *ty_int = &(Type){TY_INT};
+Type *ty_long = &(Type){TY_LONG};
+
+static void init_type(Type *ty, Node *sz) {
+  ty->size = sz;
+  ty->align = sz;
+  ty->origin_size = sz;
+}
+
+void init_type_system() {
+  init_type(ty_void, size1_node);
+  init_type(ty_bool, size1_node);
+
+  init_type(ty_char, size1_node);
+  init_type(ty_short, size2_node);
+  init_type(ty_int, size4_node);
+  init_type(ty_long, size8_node);
+}
 
 static Type *new_type(TypeKind kind) {
   Type *ty = calloc(1, sizeof(Type));
@@ -34,7 +51,7 @@ Type *copy_type(Type *ty) {
 Type *pointer_to(Type *base, Token *tok) {
   Type *ty = new_type(TY_PTR);
   ty->base = base;
-  Node *size = new_sizeof(ty, NULL);
+  Node *size = new_sizeof(ty, tok);
   ty->size = size;
   ty->align = size;
   return ty;
@@ -58,21 +75,21 @@ Type *array_of(Type *base, int len) {
 
 Type *enum_type(void) {
   Type *ty = new_type(TY_ENUM);
-  ty->align = &size4_node;
-  ty->size = &size4_node;
+  ty->align = size4_node;
+  ty->size = size4_node;
   return ty;
 }
 
 Type *struct_type(void) {
   Type *ty = new_type(TY_STRUCT);
-  ty->align = &size1_node;
-  ty->size = &size0_node;
+  ty->align = size1_node;
+  ty->size = size0_node;
   return ty;
 }
 
 Type *va_list_type(void) {
   Type *ty = new_type(TY_VA_LIST);
-  ty->align = &size8_node;   // TODO:
+  ty->align = size8_node;   // TODO:
   ty->size = new_sizeof(ty, NULL);
   return ty;
 }

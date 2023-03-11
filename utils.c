@@ -1,6 +1,6 @@
 #include "chibicc.h"
 
-int calculate_size(Type *ty) {
+static int calculate_size(Type *ty) {
   if (ty->size && ty->size->kind == ND_NUM)
     return ty->size->val;
   switch (ty->kind) {
@@ -481,9 +481,18 @@ static Node *reduce(Node *node) {
     nnode->member = node->member;
     return nnode;
   }
+  case ND_SIZEOF: {
+    int sz = calculate_size(node->sizeof_ty);
+    if (sz >= 0) {
+      Node *nnode = new_node(ND_NUM, node->tok);
+      nnode->val = sz;
+      nnode->ty = node->ty;
+      return nnode;
+    } else
+      return node;
+  }
   case ND_NUM:
   case ND_VAR:
-  case ND_SIZEOF:
   case ND_MEMZERO:
   case ND_NULL_EXPR:
     return node;

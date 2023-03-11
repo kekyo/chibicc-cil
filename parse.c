@@ -212,10 +212,6 @@ Node *new_long(int64_t val, Token *tok) {
 }
 
 Node *new_sizeof(Type *ty, Token *tok) {
-  int size = calculate_size(ty);
-  if (size >= 0)
-    return new_num(size, tok);
-
   Node *node = new_node(ND_SIZEOF, tok);
   node->sizeof_ty = ty;
   node->ty = ty_int;  // TODO: Will adjust to size_t.

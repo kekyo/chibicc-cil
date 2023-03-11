@@ -297,6 +297,8 @@ extern Type *ty_short;
 extern Type *ty_int;
 extern Type *ty_long;
 
+void init_type_system();
+
 bool is_integer(Type *ty);
 Type *copy_type(Type *ty);
 Type *pointer_to(Type *base, Token *tok);
@@ -311,7 +313,6 @@ void add_type(Node *node);
 // utils.c
 //
 
-int calculate_size(Type *ty);
 Node *align_to_node(Node *n, Node *align, Token *tok);
 void pretty_print_node(Node *node);
 bool equals_type(Type *lhs, Type *rhs);
