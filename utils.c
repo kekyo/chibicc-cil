@@ -122,6 +122,8 @@ bool equals_type(Type *lhs, Type *rhs) {
     case TY_INT:
     case TY_LONG:
     case TY_NINT:
+    case TY_FLOAT:
+    case TY_DOUBLE:
     case TY_VA_LIST:
       return true;
     case TY_ENUM:
