@@ -143,17 +143,9 @@ public static class text
         return 0;
     }
 
-    public static int getptrsize() =>
-        IntPtr.Size;
+    public static unsafe int getptrsize() =>
+        sizeof(int*);
 
-    public static unsafe void assert(int expected, int actual, sbyte* code)
-    {
-        if (expected == actual)
-        {
-            Console.WriteLine("{0} => {1}", Marshal.PtrToStringAnsi((IntPtr)code), actual);
-            return;
-        }
-        Console.WriteLine("{0} => {1} expected but got {2}", Marshal.PtrToStringAnsi((IntPtr)code), expected, actual);
+    public static unsafe void exit(int code) =>
         Environment.Exit(1);
-    }
 }

@@ -1,5 +1,14 @@
 #include "test.h"
 
+void assert(long expected, long actual, char *code) {
+  if (expected == actual) {
+    printf("%s => %ld\n", code, actual);
+  } else {
+    printf("%s => %ld expected but got %ld\n", code, expected, actual);
+    exit(1);
+  }
+}
+
 static int static_fn() { return 5; }
 int ext1 = 5;
 int *ext2 = &ext1;
