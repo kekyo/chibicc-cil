@@ -119,6 +119,7 @@ bool equals_type(Type *lhs, Type *rhs) {
     case TY_SHORT:
     case TY_INT:
     case TY_LONG:
+    case TY_NINT:
     case TY_VA_LIST:
       return true;
     case TY_ENUM:
@@ -455,6 +456,7 @@ static Node *reduce(Node *node) {
         return new_num((uint32_t)lhs->val, node->tok);
       case TY_LONG:
         return new_long(lhs->val, node->tok);
+      case TY_NINT:
       case TY_PTR: {
         Node *nnode = new_num(lhs->val, node->tok);
         nnode->ty = node->ty;

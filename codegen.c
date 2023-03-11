@@ -84,6 +84,8 @@ static const char *to_cil_typename(Type *ty) {
       return "int32";
     case TY_LONG:
       return "int64";
+    case TY_NINT:
+      return "nint";
     case TY_ARRAY:
       if (ty->array_len >= 1)
         return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
@@ -170,6 +172,7 @@ static void load(Type *ty) {
     case TY_VA_LIST:
       println("  ldobj %s", to_cil_typename(ty));
       return;
+    case TY_NINT:
     case TY_PTR:
       println("  ldind.i");
       return;
@@ -205,6 +208,9 @@ static void store(Type *ty) {
       println("  conv.u");
       println("  stind.i");
       return;
+    case TY_NINT:
+      println("  stind.i");
+      return;
     case TY_BOOL:
       println("  stind.i1");
       return;
@@ -225,7 +231,20 @@ static void store(Type *ty) {
   unreachable();
 }
 
-enum { I8, I16, I32, I64, IPTR };
+static void gen_comp_val(Type *comp_ty) {
+  println("  ldc.i4.0");
+  switch (comp_ty->kind) {
+    case TY_LONG:
+      println("  conv.i8");
+      break;
+    case TY_NINT:
+    case TY_PTR:
+      println("  conv.i");
+      break;
+  }
+}
+
+typedef enum { I8, I16, I32, I64, NINT } TypeId;
 
 static int getTypeId(Type *ty) {
   switch (ty->kind) {
@@ -239,45 +258,48 @@ static int getTypeId(Type *ty) {
     return I32;
   case TY_LONG:
     return I64;
+  case TY_NINT:
   case TY_PTR:
   case TY_ARRAY:
-    return IPTR;
+    return NINT;
   }
   error("internal error at %s:%d, %d", __FILE__, __LINE__, ty->kind);
 }
 
 // The table for type casts
-static char convi8[] = "conv.i1";
-static char convi16[] = "conv.i2";
-static char convi32[] = "conv.i4";
-static char convi64[] = "conv.i8";
-static char conviptr[] = "conv.i";
+static char convi1[] = "conv.i1";
+static char convi2[] = "conv.i2";
+static char convi4[] = "conv.i4";
+static char convi8[] = "conv.i8";
+static char convnint[] = "conv.i";
 
 static char *cast_table[][10] = {
-// to i8    i16      i32      i64      iptr         // from
-  { NULL,   NULL,    NULL,    convi64, conviptr },  // i8
-  { convi8, NULL,    NULL,    convi64, conviptr },  // i16
-  { convi8, convi16, NULL,    convi64, conviptr },  // i32
-  { convi8, convi16, convi32, NULL,    conviptr },  // i64
-  { convi8, convi16, convi32, convi64, NULL     },  // iptr
+// to i8    i16     i32     i64     nint        // from
+  { NULL,   NULL,   NULL,   convi8, convnint },  // i8
+  { convi1, NULL,   NULL,   convi8, convnint },  // i16
+  { convi1, convi2, NULL,   convi8, convnint },  // i32
+  { convi1, convi2, convi4, NULL,   convnint },  // i64
+  { convi1, convi2, convi4, convi8, NULL     },  // nint
 };
 
 static void cast(Type *from, Type *to) {
+  if (from == to)
+    return;
   if (from->kind == to->kind)
     return;
   if (to->kind == TY_VOID)
     return;
 
   if (to->kind == TY_BOOL) {
-    println("  ldc.i4.0");
+    gen_comp_val(from);
     println("  ceq");
     println("  ldc.i4.0");
     println("  ceq");
     return;
   }
 
-  int t1 = getTypeId(from);
-  int t2 = getTypeId(to);
+  TypeId t1 = getTypeId(from);
+  TypeId t2 = getTypeId(to);
   if (cast_table[t1][t2])
     println("  %s", cast_table[t1][t2]);
 }
@@ -344,7 +366,7 @@ static void gen_funcall(Node *node, bool will_discard) {
   } else {
     switch (node->ty->kind) {
     case TY_BOOL:
-      println("  conv.i1");
+      println("  conv.u1");
       println("  ldc.i4.0");
       println("  ceq");
       println("  ldc.i4.0");
@@ -355,6 +377,10 @@ static void gen_funcall(Node *node, bool will_discard) {
       return;
     case TY_SHORT:
       println("  conv.i2");
+      return;
+    case TY_NINT:
+    case TY_PTR:
+      println("  conv.i");
       return;
     }
   }
@@ -376,8 +402,11 @@ static void gen_expr(Node *node, bool will_discard) {
     if (!will_discard) {
       if (node->ty->kind == TY_LONG)
         println("  ldc.i8 %ld", node->val);
-      else
-        println("  ldc.i4 %d", (int)node->val);
+      else if (node->ty->kind == TY_NINT) {
+        println("  ldc.i8 %ld", node->val);
+        println("  conv.i");
+      } else
+        println("  ldc.i4 %d", (int32_t)node->val);
     }
     return;
   case ND_NEG:
@@ -471,9 +500,7 @@ static void gen_expr(Node *node, bool will_discard) {
   case ND_COND: {
     int c = count();
     gen_expr(node->cond, false);
-    println("  ldc.i4.0");
-    if (node->cond->ty->kind == TY_LONG)
-      println("  conv.i8");
+    gen_comp_val(node->cond->ty);
     println("  beq _L_else_%d", c);
     gen_expr(node->then, will_discard);
     println("  br _L_end_%d", c);
@@ -485,9 +512,7 @@ static void gen_expr(Node *node, bool will_discard) {
   case ND_NOT:
     gen_expr(node->lhs, will_discard);
     if (!will_discard) {
-      println("  ldc.i4.0");
-      if (node->lhs->ty->kind == TY_LONG)
-        println("  conv.i8");
+      gen_comp_val(node->lhs->ty);
       println("  ceq");
     }
     return;
@@ -500,14 +525,10 @@ static void gen_expr(Node *node, bool will_discard) {
     int c = count();
     if (!will_discard) {
       gen_expr(node->lhs, false);
-      println("  ldc.i4.0");
-      if (node->lhs->ty->kind == TY_LONG)
-        println("  conv.i8");
+      gen_comp_val(node->lhs->ty);
       println("  beq.s _L_false_%d", c);
       gen_expr(node->rhs, false);
-      println("  ldc.i4.0");
-      if (node->rhs->ty->kind == TY_LONG)
-        println("  conv.i8");
+      gen_comp_val(node->rhs->ty);
       println("  beq.s _L_false_%d", c);
       println("  ldc.i4.1");
       println("  br.s _L_end_%d", c);
@@ -516,9 +537,7 @@ static void gen_expr(Node *node, bool will_discard) {
       println("_L_end_%d:", c);
     } else {
       gen_expr(node->lhs, false);
-      println("  ldc.i4.0");
-      if (node->lhs->ty->kind == TY_LONG)
-        println("  conv.i8");
+      gen_comp_val(node->lhs->ty);
       println("  beq.s _L_end_%d", c);
       gen_expr(node->rhs, true);
       println("_L_end_%d:", c);
@@ -529,14 +548,10 @@ static void gen_expr(Node *node, bool will_discard) {
     int c = count();
     if (!will_discard) {
       gen_expr(node->lhs, false);
-      println("  ldc.i4.0");
-      if (node->lhs->ty->kind == TY_LONG)
-        println("  conv.i8");
+      gen_comp_val(node->lhs->ty);
       println("  bne.un.s _L_true_%d", c);
       gen_expr(node->rhs, false);
-      println("  ldc.i4.0");
-      if (node->rhs->ty->kind == TY_LONG)
-        println("  conv.i8");
+      gen_comp_val(node->rhs->ty);
       println("  bne.un.s _L_true_%d", c);
       println("  ldc.i4.0");
       println("  br.s _L_end_%d", c);
@@ -545,9 +560,7 @@ static void gen_expr(Node *node, bool will_discard) {
       println("_L_end_%d:", c);
     } else {
       gen_expr(node->lhs, false);
-      println("  ldc.i4.0");
-      if (node->lhs->ty->kind == TY_LONG)
-        println("  conv.i8");
+      gen_comp_val(node->lhs->ty);
       println("  bne.un.s _L_end_%d", c);
       gen_expr(node->rhs, true);
       println("_L_end_%d:", c);

@@ -222,6 +222,7 @@ typedef enum {
   TY_SHORT,
   TY_INT,
   TY_LONG,
+  TY_NINT,
   TY_ENUM,
   TY_PTR,
   TY_FUNC,
@@ -296,6 +297,8 @@ extern Type *ty_char;
 extern Type *ty_short;
 extern Type *ty_int;
 extern Type *ty_long;
+
+extern Type *ty_nint;
 
 void init_type_system();
 

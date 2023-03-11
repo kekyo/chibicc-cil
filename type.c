@@ -5,6 +5,7 @@ static Node *size1_node = &(Node){ND_NUM, 1};
 static Node *size2_node = &(Node){ND_NUM, 2};
 static Node *size4_node = &(Node){ND_NUM, 4};
 static Node *size8_node = &(Node){ND_NUM, 8};
+static Node *sizenint_node = &(Node){ND_SIZEOF, 0};
 
 Type *ty_void = &(Type){TY_VOID};
 Type *ty_bool = &(Type){TY_BOOL};
@@ -13,6 +14,8 @@ Type *ty_char = &(Type){TY_CHAR};
 Type *ty_short = &(Type){TY_SHORT};
 Type *ty_int = &(Type){TY_INT};
 Type *ty_long = &(Type){TY_LONG};
+
+Type *ty_nint = &(Type){TY_NINT};
 
 static void init_type(Type *ty, Node *sz) {
   ty->size = sz;
@@ -28,6 +31,8 @@ void init_type_system() {
   init_type(ty_short, size2_node);
   init_type(ty_int, size4_node);
   init_type(ty_long, size8_node);
+
+  init_type(ty_nint, sizenint_node);
 }
 
 static Type *new_type(TypeKind kind) {
@@ -39,7 +44,7 @@ static Type *new_type(TypeKind kind) {
 bool is_integer(Type *ty) {
   TypeKind k = ty->kind;
   return k == TY_BOOL || k == TY_CHAR || k == TY_SHORT ||
-         k == TY_INT  || k == TY_LONG || k == TY_ENUM;
+         k == TY_INT  || k == TY_LONG || k == TY_NINT || k == TY_ENUM;
 }
 
 Type *copy_type(Type *ty) {
@@ -97,6 +102,8 @@ Type *va_list_type(void) {
 static Type *get_common_type(Type *ty1, Type *ty2, Token *tok) {
   if (ty1->base)
     return pointer_to(ty1->base, tok);
+  if (ty1->kind == TY_NINT || ty2->kind == TY_NINT)
+    return ty_nint;
   if (ty1->kind == TY_LONG || ty2->kind == TY_LONG)
     return ty_long;
   return ty_int;
