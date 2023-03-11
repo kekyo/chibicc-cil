@@ -81,6 +81,7 @@ struct Obj {
   Obj *next;
   char *name;    // Variable name
   Type *ty;      // Type
+  Token *tok;    // representative token
   ObjKind kind;
   Node *align;   // alignment
 
@@ -251,6 +252,7 @@ struct Type {
 
   // Declaration
   Token *name;
+  Token *name_pos;
 
   // Array
   int array_len;
