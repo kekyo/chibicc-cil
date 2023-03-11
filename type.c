@@ -6,6 +6,7 @@ static Node *size2_node = &(Node){ND_NUM, 2};
 static Node *size4_node = &(Node){ND_NUM, 4};
 static Node *size8_node = &(Node){ND_NUM, 8};
 static Node *sizenint_node = &(Node){ND_SIZEOF, 0};
+static Node *sizenuint_node = &(Node){ND_SIZEOF, 0};
 
 Type *ty_void = &(Type){TY_VOID};
 Type *ty_bool = &(Type){TY_BOOL};
@@ -15,24 +16,48 @@ Type *ty_short = &(Type){TY_SHORT};
 Type *ty_int = &(Type){TY_INT};
 Type *ty_long = &(Type){TY_LONG};
 
-Type *ty_nint = &(Type){TY_NINT};
+Type *ty_uchar = &(Type){TY_CHAR};
+Type *ty_ushort = &(Type){TY_SHORT};
+Type *ty_uint = &(Type){TY_INT};
+Type *ty_ulong = &(Type){TY_LONG};
 
-static void init_type(Type *ty, Node *sz) {
+Type *ty_nint = &(Type){TY_NINT};
+Type *ty_nuint = &(Type){TY_NINT};
+
+static void init_type(Type *ty, Node *sz, bool is_unsigned) {
   ty->size = sz;
   ty->align = sz;
   ty->origin_size = sz;
+  ty->is_unsigned = is_unsigned;
 }
 
 void init_type_system() {
-  init_type(ty_void, size1_node);
-  init_type(ty_bool, size1_node);
+  size0_node->ty = ty_nuint;
+  size1_node->ty = ty_nuint;
+  size2_node->ty = ty_nuint;
+  size4_node->ty = ty_nuint;
+  size8_node->ty = ty_nuint;
 
-  init_type(ty_char, size1_node);
-  init_type(ty_short, size2_node);
-  init_type(ty_int, size4_node);
-  init_type(ty_long, size8_node);
+  sizenint_node->ty = ty_nuint;
+  sizenint_node->sizeof_ty = ty_nint;
+  sizenuint_node->ty = ty_nuint;
+  sizenuint_node->sizeof_ty = ty_nuint;
 
-  init_type(ty_nint, sizenint_node);
+  init_type(ty_void, size1_node, false);
+  init_type(ty_bool, size1_node, true);
+
+  init_type(ty_char, size1_node, false);
+  init_type(ty_short, size2_node, false);
+  init_type(ty_int, size4_node, false);
+  init_type(ty_long, size8_node, false);
+  
+  init_type(ty_uchar, size1_node, true);
+  init_type(ty_ushort, size2_node, true);
+  init_type(ty_uint, size4_node, true);
+  init_type(ty_ulong, size8_node, true);
+
+  init_type(ty_nint, sizenint_node, false);
+  init_type(ty_nuint, sizenuint_node, true);
 }
 
 static Type *new_type(TypeKind kind) {
@@ -99,14 +124,43 @@ Type *va_list_type(void) {
   return ty;
 }
 
+static int get_type_comparer(Type *ty) {
+  switch (ty->kind) {
+  case TY_BOOL:
+  case TY_CHAR:
+    return 1;
+  case TY_SHORT:
+    return 2;
+  case TY_ENUM:
+  case TY_INT:
+    return 3;
+  case TY_LONG:
+    return 4;
+  case TY_NINT:
+  case TY_PTR:
+    return 5;
+  }
+  unreachable();
+}
+
 static Type *get_common_type(Type *ty1, Type *ty2, Token *tok) {
   if (ty1->base)
     return pointer_to(ty1->base, tok);
-  if (ty1->kind == TY_NINT || ty2->kind == TY_NINT)
-    return ty_nint;
-  if (ty1->kind == TY_LONG || ty2->kind == TY_LONG)
-    return ty_long;
-  return ty_int;
+
+  int comp1 = get_type_comparer(ty1);
+  int comp2 = get_type_comparer(ty2);
+
+  if (comp1 < 3)   // < TY_INT
+    ty1 = ty_int;
+  if (comp2 < 3)   // < TY_INT
+    ty2 = ty_int;
+
+  if (comp1 != comp2)
+    return (comp1 < comp2) ? ty2 : ty1;
+
+  if (ty2->is_unsigned)
+    return ty2;
+  return ty1;
 }
 
 // For many binary operators, we implicitly promote operands so that
@@ -230,6 +284,9 @@ void add_type(Node *node) {
       }
     }
     error_tok(node->tok, "statement expression returning void is not supported");
+    return;
+  case ND_NULL_EXPR:
+    node->ty = ty_void;
     return;
   }
 }

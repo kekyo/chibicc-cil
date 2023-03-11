@@ -204,17 +204,17 @@ Node *new_num(int64_t val, Token *tok) {
   return node;
 }
 
-Node *new_long(int64_t val, Token *tok) {
+Node *new_typed_num(int64_t val, Type *ty, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->val = val;
-  node->ty = ty_long;
+  node->ty = ty;
   return node;
 }
 
 Node *new_sizeof(Type *ty, Token *tok) {
   Node *node = new_node(ND_SIZEOF, tok);
   node->sizeof_ty = ty;
-  node->ty = ty_int;  // TODO: Will adjust to size_t.
+  node->ty = ty_nuint;    // size_t
   return node;
 }
 
@@ -369,7 +369,7 @@ static void push_tag_scope(Token *tok, Type *ty) {
 
 // declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long" | "__builtin_va_list"
 //             | "typedef" | "static" | "extern"
-//             | "signed"
+//             | "signed" | "unsigned"
 //             | struct-decl | union-decl | typedef-name
 //             | enum-specifier)+
 //
@@ -398,6 +398,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     LONG   = 1 << 10,
     OTHER  = 1 << 12,
     SIGNED = 1 << 13,
+    UNSIGNED = 1 << 14,
   };
 
   Type *ty = ty_int;
@@ -479,6 +480,8 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
       counter += LONG;
     else if (equal(tok, "signed"))
       counter |= SIGNED;
+    else if (equal(tok, "unsigned"))
+      counter |= UNSIGNED;
     else
       unreachable();
 
@@ -493,16 +496,27 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     case SIGNED + CHAR:
       ty = ty_char;
       break;
+    case UNSIGNED + CHAR:
+      ty = ty_uchar;
+      break;
     case SHORT:
     case SHORT + INT:
     case SIGNED + SHORT:
     case SIGNED + SHORT + INT:
       ty = ty_short;
       break;
+    case UNSIGNED + SHORT:
+    case UNSIGNED + SHORT + INT:
+      ty = ty_ushort;
+      break;
     case INT:
     case SIGNED:
     case SIGNED + INT:
       ty = ty_int;
+      break;
+    case UNSIGNED:
+    case UNSIGNED + INT:
+      ty = ty_uint;
       break;
     case LONG:
     case LONG + INT:
@@ -513,6 +527,12 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     case SIGNED + LONG + LONG:
     case SIGNED + LONG + LONG + INT:
       ty = ty_long;
+      break;
+    case UNSIGNED + LONG:
+    case UNSIGNED + LONG + INT:
+    case UNSIGNED + LONG + LONG:
+    case UNSIGNED + LONG + LONG + INT:
+      ty = ty_ulong;
       break;
     default:
       error_tok(tok, "invalid type");
@@ -1059,7 +1079,7 @@ static void gvar_initializer(Token **rest, Token *tok, Obj *var) {
 static bool is_typename(Token *tok) {
   static char *kw[] = {
     "void", "_Bool", "char", "short", "int", "long", "struct", "union",
-    "typedef", "enum", "static", "extern", "_Alignas", "__builtin_va_list", "signed",
+    "typedef", "enum", "static", "extern", "_Alignas", "__builtin_va_list", "signed", "unsigned",
   };
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)

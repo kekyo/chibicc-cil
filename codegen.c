@@ -77,15 +77,15 @@ static const char *to_cil_typename(Type *ty) {
     case TY_BOOL:
       return "bool";
     case TY_CHAR:
-      return "int8";
+      return ty->is_unsigned ? "uint8" : "int8";
     case TY_SHORT:
-      return "int16";
+      return ty->is_unsigned ? "uint16" : "int16";
     case TY_INT:
-      return "int32";
+      return ty->is_unsigned ? "uint32" : "int32";
     case TY_LONG:
-      return "int64";
+      return ty->is_unsigned ? "uint64" : "int64";
     case TY_NINT:
-      return "nint";
+      return ty->is_unsigned ? "nuint" : "nint";
     case TY_ARRAY:
       if (ty->array_len >= 1)
         return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
@@ -172,25 +172,31 @@ static void load(Type *ty) {
     case TY_VA_LIST:
       println("  ldobj %s", to_cil_typename(ty));
       return;
-    case TY_NINT:
-    case TY_PTR:
-      println("  ldind.i");
-      return;
     case TY_BOOL:
       println("  ldind.u1");
       return;
-    case TY_CHAR:
-      println("  ldind.i1");
-      return;
-    case TY_SHORT:
-      println("  ldind.i2");
-      return;
     case TY_ENUM:
-    case TY_INT:
       println("  ldind.i4");
       return;
     case TY_LONG:
       println("  ldind.i8");
+      return;
+    case TY_NINT:
+    case TY_PTR:
+      println("  ldind.i");
+      return;
+  }
+
+  char *insn = ty->is_unsigned ? "u" : "i";
+  switch (ty->kind) {
+    case TY_CHAR:
+      println("  ldind.%s1", insn);
+      return;
+    case TY_SHORT:
+      println("  ldind.%s2", insn);
+      return;
+    case TY_INT:
+      println("  ldind.%s4", insn);
       return;
   }
   unreachable();
@@ -204,16 +210,11 @@ static void store(Type *ty) {
     case TY_VA_LIST:
       println("  stobj %s", to_cil_typename(ty));
       return;
-    case TY_PTR:
-      println("  conv.u");
-      println("  stind.i");
-      return;
     case TY_NINT:
+    case TY_PTR:
       println("  stind.i");
       return;
     case TY_BOOL:
-      println("  stind.i1");
-      return;
     case TY_CHAR:
       println("  stind.i1");
       return;
@@ -244,42 +245,53 @@ static void gen_comp_val(Type *comp_ty) {
   }
 }
 
-typedef enum { I8, I16, I32, I64, NINT } TypeId;
+typedef enum { I8, I16, I32, I64, NINT, U8, U16, U32, U64, NUINT } TypeId;
 
-static int getTypeId(Type *ty) {
+static TypeId getTypeId(Type *ty) {
   switch (ty->kind) {
   case TY_BOOL:
+    return U8;
   case TY_CHAR:
-    return I8;
+    return ty->is_unsigned ? U8 : I8;
   case TY_SHORT:
-    return I16;
+    return ty->is_unsigned ? U16 : I16;
   case TY_ENUM:
-  case TY_INT:
     return I32;
+  case TY_INT:
+    return ty->is_unsigned ? U32 : I32;
   case TY_LONG:
-    return I64;
+    return ty->is_unsigned ? U64 : I64;
   case TY_NINT:
   case TY_PTR:
-  case TY_ARRAY:
-    return NINT;
+    return ty->is_unsigned ? NUINT : NINT;
   }
-  error("internal error at %s:%d, %d", __FILE__, __LINE__, ty->kind);
+  return NUINT;
 }
 
 // The table for type casts
 static char convi1[] = "conv.i1";
+static char convu1[] = "conv.u1";
 static char convi2[] = "conv.i2";
+static char convu2[] = "conv.u2";
 static char convi4[] = "conv.i4";
+static char convu4[] = "conv.u4";
 static char convi8[] = "conv.i8";
+static char convu8[] = "conv.u8";
 static char convnint[] = "conv.i";
+static char convnuint[] = "conv.u";
 
 static char *cast_table[][10] = {
-// to i8    i16     i32     i64     nint        // from
-  { NULL,   NULL,   NULL,   convi8, convnint },  // i8
-  { convi1, NULL,   NULL,   convi8, convnint },  // i16
-  { convi1, convi2, NULL,   convi8, convnint },  // i32
-  { convi1, convi2, convi4, NULL,   convnint },  // i64
-  { convi1, convi2, convi4, convi8, NULL     },  // nint
+// to i8    i16     i32     i64     nint       u8      u16     u32     u64     nuint           // from
+  { NULL,   NULL,   NULL,   convi8, convnint,  NULL,   NULL,   NULL,   convi8, convnint  },    // i8
+  { convi1, NULL,   NULL,   convi8, convnint,  convu1, NULL,   NULL,   convi8, convnint  },    // i16
+  { convi1, convi2, NULL,   convi8, convnint,  convu1, convu2, NULL,   convi8, convnint  },    // i32
+  { convi1, convi2, convi4, NULL,   convnint,  convu1, convu2, convu4, NULL,   convnint  },    // i64
+  { convi1, convi2, convi4, convi8, NULL,      convu1, convu2, convu4, convi8, NULL      },    // nint
+  { NULL,   NULL,   NULL,   convu8, convnuint, NULL,   NULL,   NULL,   convu8, convnuint },    // u8
+  { convu1, NULL,   NULL,   convu8, convnuint, convu1, NULL,   NULL,   convu8, convnuint },    // u16
+  { convu1, convu2, NULL,   convu8, convnuint, convu1, convu2, NULL,   convu8, convnuint },    // u32
+  { convu1, convu2, convu4, NULL,   convnuint, convu1, convu2, convu4, NULL,   convnuint },    // u64
+  { convu1, convu2, convu4, convu8, NULL,      convu1, convu2, convu4, convu8, NULL      },    // nuint
 };
 
 static void cast(Type *from, Type *to) {
@@ -373,14 +385,23 @@ static void gen_funcall(Node *node, bool will_discard) {
       println("  ceq");
       return;
     case TY_CHAR:
-      println("  conv.i1");
+      if (node->ty->is_unsigned)
+        println("  conv.u1");
+      else
+        println("  conv.i1");
       return;
     case TY_SHORT:
-      println("  conv.i2");
+      if (node->ty->is_unsigned)
+        println("  conv.u2");
+      else
+        println("  conv.i2");
       return;
     case TY_NINT:
     case TY_PTR:
-      println("  conv.i");
+      if (node->ty->is_unsigned)
+        println("  conv.u");
+      else
+        println("  conv.i");
       return;
     }
   }
@@ -400,13 +421,23 @@ static void gen_expr(Node *node, bool will_discard) {
     return;
   case ND_NUM:
     if (!will_discard) {
-      if (node->ty->kind == TY_LONG)
-        println("  ldc.i8 %ld", node->val);
-      else if (node->ty->kind == TY_NINT) {
-        println("  ldc.i8 %ld", node->val);
-        println("  conv.i");
-      } else
-        println("  ldc.i4 %d", (int32_t)node->val);
+      switch (node->ty->kind) {
+        case TY_CHAR:
+        case TY_SHORT:
+        case TY_INT:
+        case TY_ENUM:
+          println("  ldc.i4 %d", (int32_t)node->val);
+          return;
+        case TY_LONG:
+          println("  ldc.i8 %ld", node->val);
+          return;
+        case TY_NINT:
+        case TY_PTR:
+          println("  ldc.i8 %ld", node->val);
+          println("  conv.i");
+          return;
+      }
+      unreachable();
     }
     return;
   case ND_NEG:
@@ -446,12 +477,14 @@ static void gen_expr(Node *node, bool will_discard) {
           if (node->sizeof_ty->array_len == 0) {
             aggregate_type(node->sizeof_ty);
             println("  ldc.i4.0");
+            println("  conv.u");   // Cast to size_t
             return;
           } else if (node->sizeof_ty->array_len < 0)
             unreachable();
           break;
       }
       println("  sizeof %s", to_cil_typename(node->sizeof_ty));
+      println("  conv.u");   // Cast to size_t
       aggregate_type(node->sizeof_ty);
     }
     return;
@@ -589,10 +622,16 @@ static void gen_expr(Node *node, bool will_discard) {
     println("  mul");
     return;
   case ND_DIV:
-    println("  div");
+    if (node->ty->is_unsigned)
+      println("  div.un");
+    else
+      println("  div");
     return;
   case ND_MOD:
-    println("  rem");
+    if (node->ty->is_unsigned)
+      println("  rem.un");
+    else
+      println("  rem");
     return;
   case ND_BITAND:
     println("  and");
@@ -612,10 +651,16 @@ static void gen_expr(Node *node, bool will_discard) {
     println("  ceq");
     return;
   case ND_LT:
-    println("  clt");
+    if (node->lhs->ty->is_unsigned)
+      println("  clt.un");
+    else
+      println("  clt");
     return;
   case ND_LE:
-    println("  cgt");
+    if (node->lhs->ty->is_unsigned)
+      println("  cgt.un");
+    else
+      println("  cgt");
     println("  ldc.i4.0");
     println("  ceq");
     return;
@@ -623,7 +668,10 @@ static void gen_expr(Node *node, bool will_discard) {
     println("  shl");
     return;
   case ND_SHR:
-    println("  shr");
+    if (node->lhs->ty->is_unsigned)
+      println("  shr.un");
+    else
+      println("  shr");
     return;
   }
 

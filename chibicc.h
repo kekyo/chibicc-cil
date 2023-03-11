@@ -206,7 +206,7 @@ Node *new_node(NodeKind kind, Token *tok);
 Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok);
 Node *new_unary(NodeKind kind, Node *expr, Token *tok);
 Node *new_num(int64_t val, Token *tok);
-Node *new_long(int64_t val, Token *tok);
+Node *new_typed_num(int64_t val, Type *ty, Token *tok);
 Node *new_sizeof(Type *ty, Token *tok);
 Node *new_cast(Node *expr, Type *ty);
 Obj *parse(Token *tok);
@@ -234,9 +234,10 @@ typedef enum {
 
 struct Type {
   TypeKind kind;
-  Node *size;      // sizeof() value
-  Node *align;     // alignment
+  Node *size;         // sizeof() value
+  Node *align;        // alignment
   Node *origin_size;
+  bool is_unsigned;   // unsigned or signed
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -298,7 +299,13 @@ extern Type *ty_short;
 extern Type *ty_int;
 extern Type *ty_long;
 
+extern Type *ty_uchar;
+extern Type *ty_ushort;
+extern Type *ty_uint;
+extern Type *ty_ulong;
+
 extern Type *ty_nint;
+extern Type *ty_nuint;
 
 void init_type_system();
 
