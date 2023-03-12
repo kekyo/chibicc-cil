@@ -318,6 +318,11 @@ static Node *cast_type(Node *node, Type *ty) {
 }
 
 static Node *reduce(Node *node) {
+  if (node->is_reduced)
+    return node;
+
+  node->is_reduced = true;
+
   Node *lhs;
   Node *rhs;
 

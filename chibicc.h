@@ -197,6 +197,8 @@ struct Node {
   Node *next;    // Next node
   Type *ty;      // Type, e.g. int or pointer to int
   Token *tok;    // Representative token
+  
+  bool is_reduced;
 
   Node *lhs;     // Left-hand side
   Node *rhs;     // Right-hand side

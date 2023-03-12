@@ -171,6 +171,7 @@ Node *new_unary(NodeKind kind, Node *expr, Token *tok) {
 Node *new_num(int64_t val, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->val = val;
+  node->is_reduced = true;
   return node;
 }
 
@@ -178,6 +179,7 @@ Node *new_flonum(double fval, Type *ty, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->fval = fval;
   node->ty = ty;
+  node->is_reduced = true;
   return node;
 }
 
@@ -185,6 +187,7 @@ Node *new_typed_num(int64_t val, Type *ty, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->val = val;
   node->ty = ty;
+  node->is_reduced = true;
   return node;
 }
 
@@ -198,6 +201,7 @@ Node *new_sizeof(Type *ty, Token *tok) {
 static Node *new_var_node(Obj *var, Token *tok) {
   Node *node = new_node(ND_VAR, tok);
   node->var = var;
+  node->is_reduced = true;
   return node;
 }
 
@@ -1050,6 +1054,7 @@ static Node *init_desg_expr(InitDesg *desg, Token *tok) {
 static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg, Token *tok) {
   if (ty->kind == TY_ARRAY) {
     Node *node = new_node(ND_NULL_EXPR, tok);
+    node->is_reduced = true;
     for (int i = 0; i < ty->array_len; i++) {
       InitDesg desg2 = {desg, i};
       Node *rhs = create_lvar_init(init->children[i], ty->base, &desg2, tok);
@@ -1060,7 +1065,7 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg, Token
 
   if (ty->kind == TY_STRUCT && !init->expr) {
     Node *node = new_node(ND_NULL_EXPR, tok);
-
+    node->is_reduced = true;
     for (Member *mem = ty->members; mem; mem = mem->next) {
       InitDesg desg2 = {desg, 0, mem};
       Node *rhs = create_lvar_init(init->children[mem->idx], mem->ty, &desg2, tok);
@@ -1074,8 +1079,11 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg, Token
     return create_lvar_init(init->children[0], ty->members->ty, &desg2, tok);
   }
 
-  if (!init->expr)
-    return new_node(ND_NULL_EXPR, tok);
+  if (!init->expr) {
+    Node *node = new_node(ND_NULL_EXPR, tok);
+    node->is_reduced = true;
+    return node;
+  }
 
   Node *lhs = init_desg_expr(desg, tok);
   return new_binary(ND_ASSIGN, lhs, init->expr, tok);
@@ -1101,6 +1109,7 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
   // initializing it with user-supplied values.
   Node *lhs = new_node(ND_MEMZERO, tok);
   lhs->var = var;
+  lhs->is_reduced = true;
 
   Node *rhs = create_lvar_init(init, var->ty, &desg, tok);
   return new_binary(ND_COMMA, lhs, rhs, tok);
