@@ -50,23 +50,60 @@ static bool add_using_type(Type *ty) {
   return true;
 }
 
-static void aggregate_type(Type *ty) {
+static void aggregate_type_recursive(Type *ty) {
   switch (ty->kind) {
     case TY_PTR:
     case TY_ARRAY:
-      aggregate_type(ty->base);
+      if (add_using_type(ty->base))
+        aggregate_type_recursive(ty->base);
       break;
     case TY_ENUM:
       add_using_type(ty);
       break;
     case TY_STRUCT:
-    case TY_UNION:
-      if (add_using_type(ty)) {
-        // Emit member type recursively.
-        for (Member *mem = ty->members; mem; mem = mem->next)
-          aggregate_type(mem->ty);
+    case TY_UNION: {
+      // Emit member type recursively.
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        if (add_using_type(mem->ty))
+          aggregate_type_recursive(mem->ty);
       }
       break;
+    }
+  }
+}
+
+static void aggregate_type(Type *ty) {
+  if (add_using_type(ty))
+    aggregate_type_recursive(ty);
+}
+
+static void make_public_type_recursive(Type *ty) {
+  switch (ty->kind) {
+    case TY_PTR:
+    case TY_ARRAY:
+      if (!ty->base->is_public) {
+        ty->base->is_public = true;
+        make_public_type_recursive(ty->base);
+      }
+      break;
+    case TY_STRUCT:
+    case TY_UNION: {
+      // Emit member type recursively.
+      for (Member *mem = ty->members; mem; mem = mem->next) {
+        if (!mem->ty->is_public) {
+          mem->ty->is_public = true;
+          make_public_type_recursive(mem->ty);
+        }
+      }
+      break;
+    }
+  }
+}
+
+static void make_public_type(Type *ty) {
+  if (!ty->is_public) {
+    ty->is_public = true;
+    make_public_type_recursive(ty);
   }
 }
 
@@ -101,10 +138,17 @@ static const char *to_cil_typename(Type *ty) {
     case TY_ENUM:
     case TY_STRUCT:
     case TY_UNION:
-      if (ty->tag)
-        return format("%s_%p", get_string(ty->tag), ty);
-      else
-        return format("tag_%p", ty);
+      if (ty->tag_scope)
+        return ty->is_public ?
+          ty->tag_scope->name :
+          format("@%s_%p", ty->tag_scope->name, ty);
+      else if (ty->typedef_name) {
+        const char *name = get_string(ty->typedef_name);
+        return ty->is_public ?
+          name :
+          format("@%s_%p", name, ty);
+      } else
+        return format("@tag_%p", ty);
     case TY_VA_LIST:
       return "System.ArgIterator";
   }
@@ -845,33 +889,50 @@ static bool gen_stmt(Node *node) {
   error_tok(node->tok, "invalid statement");
 }
 
-static void emit_type(Obj *prog) {
-  for (Obj *fn = prog; fn; fn = fn->next) {
-    if (fn->is_function) {
-      aggregate_type(fn->ty->return_ty);
+static void aggregate_types(Obj *prog) {
+  for (Obj *ob = prog; ob; ob = ob->next) {
+    if (ob->kind == OB_GLOBAL_TYPE) {
+      // The type of a global variable is always public,
+      // even if it is marked static.
+      // Since the C language does not allow types to be explicitly given a scope,
+      // the type of a global variable can be considered to be in a visible state.
+      make_public_type(ob->ty);
+    }
+    
+    if (ob->is_function) {
+      // Function
+      aggregate_type(ob->ty->return_ty);
+      make_public_type(ob->ty->return_ty);
 
-      // Included parameter/local variable types.
-      for (Obj *var = fn->params; var; var = var->next) {
+      // Included parameter variable types.
+      for (Obj *var = ob->params; var; var = var->next) {
         aggregate_type(var->ty);
+        make_public_type(var->ty);
       }
-      for (Obj *var = fn->locals; var; var = var->next) {
+
+      // Included local variable types.
+      for (Obj *var = ob->locals; var; var = var->next)
         aggregate_type(var->ty);
-      }
-    } else
-      aggregate_type(fn->ty);
+    } else {
+      // Global variable
+      aggregate_type(ob->ty);
+    }
   }
+}
 
+static void emit_type(Obj *prog) {
   while (using_type) {
     Type *ty = using_type->ty;
+    const char *ty_scope = ty->is_public ? "public" : "file";
     switch (ty->kind) {
       case TY_ENUM:
-        println(".enumeration public int32 %s", to_cil_typename(ty));
+        println(".enumeration %s int32 %s", ty_scope, to_cil_typename(ty));
         for (EnumMember *mem = ty->enum_members; mem; mem = mem->next) {
           println("  %s %d", get_string(mem->name), mem->val);
         }
         break;
       case TY_STRUCT: {
-        println(".structure public %s", to_cil_typename(ty));
+        println(".structure %s %s", ty_scope, to_cil_typename(ty));
         Node zero = {ND_NUM, 0};
         Node *last_offset = &zero;
         Node *last_size = &zero;
@@ -908,7 +969,7 @@ static void emit_type(Obj *prog) {
         break;
       }
       case TY_UNION:
-        println(".structure public %s explicit", to_cil_typename(ty));
+        println(".structure %s %s explicit", ty_scope, to_cil_typename(ty));
         for (Member *mem = ty->members; mem; mem = mem->next)
           println("  public %s %s 0", to_cil_typename(mem->ty), get_string(mem->name));
         // Not equals both sizes.
@@ -1006,6 +1067,7 @@ void codegen(Obj *prog, FILE *out) {
   output_file = out;
   
   assign_lvar_offsets(prog);
+  aggregate_types(prog);
   emit_data(prog);
   emit_text(prog);
   emit_type(prog);

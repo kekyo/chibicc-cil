@@ -102,40 +102,45 @@ Type *pointer_to(Type *base, Token *tok) {
   return ty;
 }
 
-Type *func_type(Type *return_ty) {
+Type *func_type(Type *return_ty, Token *tok) {
   Type *ty = calloc(1, sizeof(Type));
   ty->kind = TY_FUNC;
   ty->return_ty = return_ty;
+  ty->tok = tok;
   return ty;
 }
 
-Type *array_of(Type *base, int len) {
+Type *array_of(Type *base, int len, Token *tok) {
   Type *ty = new_type(TY_ARRAY);
   ty->base = base;
   ty->array_len = len;
   ty->align = base->align;
   ty->size = new_sizeof(ty, NULL);
+  ty->tok = tok;
   return ty;
 }
 
-Type *enum_type(void) {
+Type *enum_type(Token *tok) {
   Type *ty = new_type(TY_ENUM);
   ty->align = size4_node;
   ty->size = size4_node;
+  ty->tok = tok;
   return ty;
 }
 
-Type *struct_type(void) {
+Type *struct_type(Token *tok) {
   Type *ty = new_type(TY_STRUCT);
   ty->align = size1_node;
   ty->size = size0_node;
+  ty->tok = tok;
   return ty;
 }
 
-Type *va_list_type(void) {
+Type *va_list_type(Token *tok) {
   Type *ty = new_type(TY_VA_LIST);
   ty->align = size8_node;   // TODO:
-  ty->size = new_sizeof(ty, NULL);
+  ty->size = new_sizeof(ty, tok);
+  ty->tok = tok;
   return ty;
 }
 

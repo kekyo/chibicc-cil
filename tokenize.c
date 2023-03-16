@@ -227,7 +227,7 @@ static Token *read_string_literal(char *start) {
   }
 
   Token *tok = new_token(TK_STR, start, end + 1);
-  tok->ty = array_of(ty_char, len + 1);
+  tok->ty = array_of(ty_char, len + 1, tok);
   tok->str = buf;
   return tok;
 }

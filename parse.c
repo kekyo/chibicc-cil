@@ -18,37 +18,6 @@
 
 #include "chibicc.h"
 
-// Scope for local variables, global variables, typedefs
-// or enum constants
-typedef struct VarScope VarScope;
-struct VarScope {
-  VarScope *next;
-  char *name;
-  Obj *var;
-  Type *type_def;
-  Type *enum_ty;
-  int enum_val;
-};
-
-// Scope for struct, union or enum tags
-typedef struct TagScope TagScope;
-struct TagScope {
-  TagScope *next;
-  char *name;
-  Type *ty;
-};
-
-// Represents a block scope.
-typedef struct Scope Scope;
-struct Scope {
-  Scope *next;
-
-  // C has two block scopes; one is for variables/typedefs and
-  // the other is for struct/union/enum tags.
-  VarScope *vars;
-  TagScope *tags;
-};
-
 // Variable attributes such as typedef or extern.
 typedef struct {
   bool is_typedef;
@@ -247,6 +216,7 @@ static VarScope *push_scope(char *name) {
   VarScope *sc = calloc(1, sizeof(VarScope));
   sc->name = name;
   sc->next = scope->vars;
+  sc->scope = scope;
   scope->vars = sc;
   return sc;
 }
@@ -372,7 +342,9 @@ static void push_tag_scope(Token *tok, Type *ty) {
   sc->name = strndup(tok->loc, tok->len);
   sc->ty = ty;
   sc->next = scope->tags;
+  sc->scope = scope;
   scope->tags = sc;
+  ty->tag_scope = sc;
 }
 
 // declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
@@ -475,7 +447,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     if (equal(tok, "__builtin_va_list")) {
       if (counter)
         break;
-      ty = va_list_type();
+      ty = va_list_type(tok);
       tok = tok->next;
       break;
     }
@@ -597,7 +569,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
 static Type *func_params(Token **rest, Token *tok, Type *ty) {
   if (equal(tok, "void") && equal(tok->next, ")")) {
     *rest = tok->next->next;
-    return func_type(ty);
+    return func_type(ty, ty->tok);
   }
 
   Type head = {};
@@ -632,7 +604,7 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
   if (cur == &head)
     is_variadic = true;
 
-  ty = func_type(ty);
+  ty = func_type(ty, ty->tok);
   ty->params = head.next;
   ty->is_variadic = is_variadic;
   *rest = tok->next;
@@ -641,19 +613,20 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
 
 // array-dimensions = ("static" | "restrict")* const-expr? "]" type-suffix
 static Type *array_dimensions(Token **rest, Token *tok, Type *ty) {
+  Token *origin = tok;
   while (equal(tok, "static") || equal(tok, "restrict"))
     tok = tok->next;
 
   if (equal(tok, "]")) {
     ty = type_suffix(rest, tok->next, ty);
     // Unapplied size array (length=-1) when not update length later: `int(*)[][~]`
-    return array_of(ty, -1);
+    return array_of(ty, -1, origin);
   }
 
   int sz = const_expr(&tok, tok);
   tok = skip(tok, "]");
   ty = type_suffix(rest, tok, ty);
-  return array_of(ty, sz);
+  return array_of(ty, sz, origin);
 }
 
 // type-suffix = "(" func-params
@@ -754,7 +727,7 @@ static bool consume_end(Token **rest, Token *tok) {
 //
 // enum-list      = ident ("=" num)? ("," ident ("=" num)?)* ","?
 static Type *enum_specifier(Token **rest, Token *tok) {
-  Type *ty = enum_type();
+  Type *ty = enum_type(tok);
 
   // Read a struct tag.
   Token *tag = NULL;
@@ -772,8 +745,6 @@ static Type *enum_specifier(Token **rest, Token *tok) {
     *rest = tok;
     return ty;
   }
-
-  ty->tag = tag;
 
   tok = skip(tok, "{");
 
@@ -869,7 +840,7 @@ static Token *skip_excess_element(Token *tok) {
 // string-initializer = string-literal
 static void string_initializer(Token **rest, Token *tok, Initializer *init) {
   if (init->is_flexible)
-    *init = *new_initializer(array_of(init->ty->base, tok->ty->array_len), false);
+    *init = *new_initializer(array_of(init->ty->base, tok->ty->array_len, tok), false);
 
   int len = MIN(init->ty->array_len, tok->ty->array_len);
   for (int i = 0; i < len; i++)
@@ -891,11 +862,12 @@ static int count_array_init_elements(Token *tok, Type *ty) {
 
 // array-initializer1 = "{" initializer ("," initializer)* ","? "}"
 static void array_initializer1(Token **rest, Token *tok, Initializer *init) {
+  Token *origin = tok;
   tok = skip(tok, "{");
 
   if (init->is_flexible) {
     int len = count_array_init_elements(tok, init->ty);
-    *init = *new_initializer(array_of(init->ty->base, len), false);
+    *init = *new_initializer(array_of(init->ty->base, len, origin), false);
   }
 
   for (int i = 0; !consume_end(rest, tok); i++) {
@@ -913,7 +885,7 @@ static void array_initializer1(Token **rest, Token *tok, Initializer *init) {
 static void array_initializer2(Token **rest, Token *tok, Initializer *init) {
   if (init->is_flexible) {
     int len = count_array_init_elements(tok, init->ty);
-    Type *array_ty = array_of(init->ty->base, len);
+    Type *array_ty = array_of(init->ty->base, len, tok);
     array_ty->size = reduce_node(array_ty->size);
     array_ty->align = reduce_node(array_ty->align);
     *init = *new_initializer(array_ty, false);
@@ -1971,7 +1943,7 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
   // if were a zero-sized array.
   if (cur != &head && cur->ty->kind == TY_ARRAY && cur->ty->array_len < 0) {
     // Flexible array (length=0) 
-    cur->ty = array_of(cur->ty->base, 0);
+    cur->ty = array_of(cur->ty->base, 0, cur->ty->tok);
     ty->is_flexible = true;
   }
 
@@ -1981,6 +1953,8 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
 
 // struct-union-decl = ident? ("{" struct-members)?
 static Type *struct_union_decl(Token **rest, Token *tok) {
+  Token *origin = tok;
+
   // Read a tag.
   Token *tag = NULL;
   if (tok->kind == TK_IDENT) {
@@ -1995,11 +1969,10 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
     if (ty)
       return ty;
 
-    ty = struct_type();
+    ty = struct_type(origin);
     static Node sizem1_node = {ND_NUM, -1};
     ty->size = &sizem1_node;
     ty->origin_size = &sizem1_node;
-    ty->tag = tag;
     push_tag_scope(tag, ty);
     return ty;
   }
@@ -2007,8 +1980,7 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
   tok = skip(tok, "{");
 
   // Construct a struct object.
-  Type *ty = struct_type();
-  ty->tag = tag;
+  Type *ty = struct_type(origin);
   struct_members(rest, tok, ty);
 
   if (tag) {
@@ -2016,6 +1988,7 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
     // Otherwise, register the struct type.
     for (TagScope *sc = scope->tags; sc; sc = sc->next) {
       if (equal(tag, sc->name)) {
+        ty->tag_scope = sc;
         *sc->ty = *ty;
         return sc->ty;
       }
@@ -2356,6 +2329,7 @@ static Token *parse_typedef(Token *tok, Type *basety) {
     Type *ty = declarator(&tok, tok, basety);
     if (!ty->name)
       error_tok(ty->name_pos, "typedef name omitted");
+    basety->typedef_name = ty->name;
     push_scope(get_ident(ty->name))->type_def = ty;
   }
   return tok;
@@ -2464,6 +2438,12 @@ Obj *parse(Token *tok) {
   while (tok->kind != TK_EOF) {
     VarAttr attr = {};
     Type *basety = declspec(&tok, tok, &attr);
+
+    Obj *global_ty_obj = calloc(1, sizeof(Obj));
+    global_ty_obj->kind = OB_GLOBAL_TYPE;
+    global_ty_obj->ty = basety;
+    global_ty_obj->next = globals;
+    globals = global_ty_obj;
 
     // Typedef
     if (attr.is_typedef) {

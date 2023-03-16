@@ -13,6 +13,11 @@
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
+typedef struct Obj Obj;
+typedef struct Token Token;
+typedef struct VarScope VarScope;
+typedef struct TagScope TagScope;
+typedef struct Scope Scope;
 typedef struct Type Type;
 typedef struct Node Node;
 typedef struct Member Member;
@@ -39,7 +44,6 @@ typedef enum {
 } TokenKind;
 
 // Token type
-typedef struct Token Token;
 struct Token {
   TokenKind kind; // Token kind
   Token *next;    // Next token
@@ -70,14 +74,44 @@ Token *tokenize_file(char *filename);
 // parse.c
 //
 
+// Scope for local variables, global variables, typedefs
+// or enum constants
+struct VarScope {
+  VarScope *next;
+  char *name;
+  Obj *var;
+  Type *type_def;
+  Type *enum_ty;
+  int enum_val;
+  Scope *scope;
+};
+
+// Scope for struct, union or enum tags
+struct TagScope {
+  TagScope *next;
+  char *name;
+  Type *ty;
+  Scope *scope;
+};
+
+// Represents a block scope.
+struct Scope {
+  Scope *next;
+
+  // C has two block scopes; one is for variables/typedefs and
+  // the other is for struct/union/enum tags.
+  VarScope *vars;
+  TagScope *tags;
+};
+
 typedef enum {
   OB_GLOBAL,
   OB_LOCAL,
   OB_PARAM,
+  OB_GLOBAL_TYPE,
 } ObjKind;
 
 // Variable or function
-typedef struct Obj Obj;
 struct Obj {
   Obj *next;
   char *name;    // Variable name
@@ -246,6 +280,7 @@ struct Type {
   Node *align;        // alignment
   Node *origin_size;
   bool is_unsigned;   // unsigned or signed
+  Token *tok;
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -260,12 +295,13 @@ struct Type {
   // Declaration
   Token *name;
   Token *name_pos;
+  Token *typedef_name;
 
   // Array
   int array_len;
 
   // Enum/Struct/Union
-  Token *tag;
+  TagScope *tag_scope;
 
   // Enum
   EnumMember *enum_members;
@@ -279,6 +315,8 @@ struct Type {
   Type *params;
   bool is_variadic;
   Type *next;
+
+  bool is_public;
 };
 
 // Enum member
@@ -326,11 +364,11 @@ bool is_flonum(Type *ty);
 bool is_numeric(Type *ty);
 Type *copy_type(Type *ty);
 Type *pointer_to(Type *base, Token *tok);
-Type *func_type(Type *return_ty);
-Type *array_of(Type *base, int size);
-Type *enum_type(void);
-Type *struct_type(void);
-Type *va_list_type(void);
+Type *func_type(Type *return_ty, Token *tok);
+Type *array_of(Type *base, int size, Token *tok);
+Type *enum_type(Token *tok);
+Type *struct_type(Token *tok);
+Type *va_list_type(Token *tok);
 void add_type(Node *node);
 
 //
