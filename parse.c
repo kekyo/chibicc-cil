@@ -367,7 +367,8 @@ static void push_tag_scope(Token *tok, Type *ty) {
   scope->tags = sc;
 }
 
-// declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long" | "__builtin_va_list"
+// declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
+//             | "__builtin_nint" | "__builtin_nuint" | "__builtin_va_list"
 //             | "typedef" | "static" | "extern"
 //             | "signed" | "unsigned"
 //             | struct-decl | union-decl | typedef-name
@@ -434,6 +435,22 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
         attr->align = new_num(const_expr(&tok, tok), tok);
       tok = skip(tok, ")");
       continue;
+    }
+
+    if (equal(tok, "__builtin_nint")) {
+      if (counter)
+        break;
+      ty = ty_nint;
+      tok = tok->next;
+      break;
+    }
+
+    if (equal(tok, "__builtin_nuint")) {
+      if (counter)
+        break;
+      ty = ty_nuint;
+      tok = tok->next;
+      break;
     }
 
     if (equal(tok, "__builtin_va_list")) {
@@ -1080,6 +1097,7 @@ static bool is_typename(Token *tok) {
   static char *kw[] = {
     "void", "_Bool", "char", "short", "int", "long", "struct", "union",
     "typedef", "enum", "static", "extern", "_Alignas", "__builtin_va_list", "signed", "unsigned",
+    "__builtin_nint", "__builtin_nuint",
   };
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)

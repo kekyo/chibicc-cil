@@ -1,7 +1,11 @@
-extern void __builtin_va_start(__builtin_va_list *ap, ...);
-extern void *__builtin_va_arg(__builtin_va_list *ap, ...);
+typedef __builtin_nint intptr_t;
+typedef __builtin_nuint uintptr_t;
+typedef __builtin_nuint size_t;
+typedef __builtin_va_list va_list;
 
-#define va_list __builtin_va_list
+extern void __builtin_va_start(va_list *ap, ...);
+extern void *__builtin_va_arg(va_list *ap, ...);
+
 #define va_start(ap, arg) __builtin_va_start(&(ap), (arg))
 #define va_arg(ap, tn) (*((tn *)__builtin_va_arg(&(ap), (tn *)0)))
 #define va_end(ap)
