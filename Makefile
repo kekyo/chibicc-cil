@@ -23,10 +23,12 @@ test/common.dll: test/common.cs
 	$(CSC) -t:library -out:$@ $<
 
 test/common.s: chibicc test/common
-	$(CC) -o- -E -P -C -xc test/common | ./chibicc -o $@ -
+	$(CC) -o- -E -P -C -xc test/common > test/common.cp
+	./chibicc -o $@ test/common.cp
 
 test/%.exe: chibicc test/%.c test/common.s test/common.dll
-	$(CC) -o- -E -P -C test/$*.c | ./chibicc -o test/$*.s -
+	$(CC) -o- -E -P -C test/$*.c > test/$*.cp
+	./chibicc -o test/$*.s test/$*.cp
 	$(AS) $(ASFLAGS) -r test/common.dll -o $@ test/$*.s test/common.s
 
 test: $(TESTS)
@@ -35,7 +37,7 @@ test: $(TESTS)
 	test/driver.sh
 
 clean:
-	rm -rf chibicc tmp* $(TESTS) test/*.s test/*.exe
+	rm -rf chibicc tmp* $(TESTS) test/*.cp test/*.s test/*.exe
 	find * -type f '(' -name '*~' -o -name '*.o' ')' -exec rm {} ';'
 
 .PHONY: test clean

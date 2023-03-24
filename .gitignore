@@ -2,6 +2,7 @@
 **/\#*
 **/*.o
 **/*.s
+**/*.cp
 **/a.out
 **/mono_crash*
 /tmp*
