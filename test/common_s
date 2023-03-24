@@ -4,7 +4,7 @@
     ret
 
 ; void assert(int expected, int actual, char *code)
-.function internal int32 assert expected:int32 actual:int32 code:int8*
+.function internal void assert expected:int32 actual:int32 code:int8*
     ; if (expected == actual)
     ldarg.0
     ldarg.1
@@ -32,15 +32,13 @@ L_NOTEQ:
     ldc.i4.1
     call System.Environment.Exit int32
 L_EXIT:
-    ldc.i4.0   ; HACK: Currently void type is not supported.
     ret
 
 ; void printf(char *arg)
-.function internal int32 printf arg:int8*
+.function internal void printf arg:int8*
     ldarg.0
     call System.Runtime.InteropServices.Marshal.PtrToStringAnsi intptr
     call System.Console.Write string
-    ldc.i4.0   ; HACK: Currently void type is not supported.
     ret
 
 ; static int static_fn() { return 5; }
