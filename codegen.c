@@ -396,6 +396,15 @@ static void cast(Type *from, Type *to) {
 }
 
 static void gen_funcall(Node *node, bool will_discard) {
+  // Special case: __builtin_trap()
+  if (strcmp(node->funcname, "__builtin_trap") == 0) {
+    if (node->args)
+      error_tok(node->tok, "invalid argument");
+    else
+      println("  break");
+    return;
+  }
+
   // Special case: __builtin_va_start(&ap, arg)
   if (strcmp(node->funcname, "__builtin_va_start") == 0) {
     if (!node->args)

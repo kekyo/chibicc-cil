@@ -3,6 +3,8 @@ typedef __builtin_nuint uintptr_t;
 typedef __builtin_nuint size_t;
 typedef __builtin_va_list va_list;
 
+extern void __builtin_trap();
+
 extern void __builtin_va_start(va_list *ap, ...);
 extern void *__builtin_va_arg(va_list *ap, ...);
 
