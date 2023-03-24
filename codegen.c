@@ -517,15 +517,17 @@ static bool gen_stmt(Node *node) {
     println("_L_begin_%d:", c);
     if (node->cond) {
       gen_expr(node->cond);
-      println("  brfalse _L_end_%d", c);
+      println("  brfalse %s", node->brk_label);
     }
-    gen_stmt(node->then);
-    if (node->inc) {
-      gen_expr(node->inc);
-      println("  pop");
+    bool req = gen_stmt(node->then);
+    if (req) {
+      if (node->inc) {
+        gen_expr(node->inc);
+        println("  pop");
+      }
+      println("  br _L_begin_%d", c);
     }
-    println("  br _L_begin_%d", c);
-    println("_L_end_%d:", c);
+    println("%s:", node->brk_label);
     return true;
   }
   case ND_BLOCK: {
@@ -545,10 +547,10 @@ static bool gen_stmt(Node *node) {
     return !dead;
   }
   case ND_GOTO:
-    println("  br _L_$%s", node->unique_label);
+    println("  br %s", node->unique_label);
     return false;
   case ND_LABEL:
-    println("_L_$%s:", node->unique_label);
+    println("%s:", node->unique_label);
     return gen_stmt(node->lhs);
   case ND_RETURN:
     gen_expr(node->lhs);
