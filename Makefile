@@ -1,5 +1,4 @@
 AS=chibias
-CSC=mcs -unsafe+
 
 MMODEL=
 #MMODEL=-DM32
@@ -19,17 +18,17 @@ chibicc: $(OBJS)
 
 $(OBJS): chibicc.h
 
-test/common.dll: test/common.cs
-	$(CSC) -t:library -out:$@ $<
+test/libc-bootstrap.dll: ../libc-cil/libc-bootstrap/bin/Debug/net45/libc-bootstrap.dll
+	cp ../libc-cil/libc-bootstrap/bin/Debug/net45/libc-bootstrap.dll -t test
 
-test/common.s: chibicc test/common
+test/common.s: chibicc test/common test/test.h
 	$(CC) -o- -E -P -C -xc test/common > test/common.cp
 	./chibicc -o $@ test/common.cp
 
-test/%.exe: chibicc test/%.c test/common.s test/common.dll
+test/%.exe: chibicc test/%.c test/test.h test/common.s test/libc-bootstrap.dll
 	$(CC) -o- -E -P -C test/$*.c > test/$*.cp
 	./chibicc -o test/$*.s test/$*.cp
-	$(AS) $(ASFLAGS) -r test/common.dll -o $@ test/$*.s test/common.s
+	$(AS) $(ASFLAGS) -r test/libc-bootstrap.dll -o $@ test/$*.s test/common.s
 
 test: $(TESTS)
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
@@ -37,7 +36,7 @@ test: $(TESTS)
 	test/driver.sh
 
 clean:
-	rm -rf chibicc tmp* $(TESTS) test/*.cp test/*.s test/*.exe
+	rm -rf chibicc tmp* $(TESTS) test/*.cp test/*.s test/*.exe test/libc-bootstrap.dll
 	find * -type f '(' -name '*~' -o -name '*.o' ')' -exec rm {} ';'
 
 .PHONY: test clean

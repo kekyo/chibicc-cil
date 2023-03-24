@@ -268,7 +268,7 @@ static Token *read_int_literal(char *start) {
     base = 8;
   }
 
-  int64_t val = strtoull(p, &p, base);
+  int64_t val = strtoul(p, &p, base);
 
   // Read U, L or LL suffixes.
   bool l = false;

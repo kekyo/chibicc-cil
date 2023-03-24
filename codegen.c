@@ -150,7 +150,7 @@ static const char *to_cil_typename(Type *ty) {
       } else
         return format("@tag_%p", ty);
     case TY_VA_LIST:
-      return "System.ArgIterator";
+      return "va_list";
   }
   unreachable();
 }
@@ -407,12 +407,12 @@ static void gen_funcall(Node *node, bool will_discard) {
 
   // Special case: __builtin_va_start(&ap, arg)
   if (strcmp(node->funcname, "__builtin_va_start") == 0) {
-    if (!node->args)
+    if (!node->args || !node->args->next)
       error_tok(node->tok, "invalid argument");
     else {
       gen_expr(node->args, false);
-      println("  arglist");
-      println("  call System.ArgIterator..ctor System.RuntimeArgumentHandle");
+      println("  ldarg.s %d", node->args->next->var->offset + 1);
+      println("  call __va_start");
     }
     return;
   }
@@ -434,32 +434,44 @@ static void gen_funcall(Node *node, bool will_discard) {
     if (typename_expr->ty->base->kind != TY_INT || typename_expr->lhs->kind != ND_NUM || typename_expr->lhs->val != 0)
       error_tok(arg->tok, "invalid argument");
 
-    println("  call System.ArgIterator.GetNextArg");
-    if (!will_discard) {
-      // int
-      Type *typename_ty = typename_expr->ty->base;
-      println("  refanyval %s", to_cil_typename(typename_ty));
-    }
-    else
-      println("  pop");
+    if (!will_discard)
+      println("  call __va_arg");
 
     // Avoid casting at parent.
     node->ty = typename_expr->ty;
     return;
   }
 
-  for (Node *arg = node->args; arg; arg = arg->next)
-    gen_expr(arg, false);
-  print("  call %s", node->funcname);
   if (node->func_ty->is_variadic) {
-    for (Node *arg = node->args; arg; arg = arg->next) {
-      if (arg->ty->kind == TY_ARRAY)
-        print(" %s", to_cil_typename(pointer_to(arg->ty->base, arg->tok)));
+    int param_count = 0;
+    for (Type *param_ty = node->func_ty->params; param_ty; param_ty = param_ty->next, param_count++);
+    int sentinel_count = 0;
+    for (Node *arg = node->args; arg; arg = arg->next, sentinel_count++);
+    sentinel_count -= param_count;
+
+    Node *arg2 = node->args;
+    for (int i = 0; arg2 && i < param_count; arg2 = arg2->next, i++)
+      gen_expr(arg2, false);
+
+    println("  ldc.i4 %d", sentinel_count);
+    println("  call __va_arglist_new");
+
+    for (; arg2; arg2 = arg2->next) {
+      println("  dup");
+      gen_expr(arg2, false);
+      if (arg2->ty->kind == TY_PTR || arg2->ty->kind == TY_ARRAY)
+        println("  box nint");
       else
-        print(" %s", to_cil_typename(arg->ty));
+        println("  box %s", to_cil_typename(arg2->ty));
+      println("  call __va_arglist_add");
     }
+  } else {
+    for (Node *arg = node->args; arg; arg = arg->next)
+      gen_expr(arg, false);
   }
-  println("");
+
+  println("  call %s", node->funcname);
+
   if (will_discard) {
     if (node->ty->kind != TY_VOID)
       println("  pop");
@@ -1051,6 +1063,9 @@ static void emit_text(Obj *prog) {
     
     for (Obj *var = fn->params; var; var = var->next)
       print(" %s:%s", var->name, to_cil_typename(var->ty));
+
+    if (fn->ty->is_variadic)
+      print(" C.type.__va_arglist");
 
     println("");
     current_fn = fn;

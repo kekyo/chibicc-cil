@@ -9,6 +9,10 @@ void assert(long expected, long actual, char *code) {
   }
 }
 
+int getptrsize() {
+  return sizeof(void*);
+}
+
 static int static_fn() { return 5; }
 int ext1 = 5;
 int *ext2 = &ext1;
