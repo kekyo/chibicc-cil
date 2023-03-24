@@ -122,6 +122,7 @@ static const char *to_cil_typename(Type *ty) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
+  case ND_SWITCH:
     switch (node->var->kind) {
       case OB_GLOBAL:
         // Global variable
@@ -561,6 +562,27 @@ static bool gen_stmt(Node *node) {
     println("%s:", node->brk_label);
     return true;
   }
+  case ND_SWITCH:
+    gen_expr(node->cond, true);
+    for (Node *n = node->case_next; n; n = n->case_next) {
+      gen_addr(node);
+      load(node->var->ty);
+      if (node->var->ty->kind == TY_LONG)
+        println("  ldc.i8 %ld", n->val);
+      else
+        println("  ldc.i4 %d", (int)n->val);
+      println("  beq %s", n->label);
+    }
+    if (node->default_case)
+      println("  br %s", node->default_case->label);
+    else
+      println("  br %s", node->brk_label);
+    gen_stmt(node->then);
+    println("%s:", node->brk_label);
+    return true;
+  case ND_CASE:
+    println("%s:", node->label);
+    return gen_stmt(node->lhs);
   case ND_BLOCK: {
     Node *n = node->body;
     bool dead = false;
@@ -568,7 +590,7 @@ static bool gen_stmt(Node *node) {
       if (!dead) {
         if (!gen_stmt(n))
           dead = true;
-      } else if (n->kind == ND_LABEL && n->is_resolved_label) {
+      } else if (n->kind == ND_CASE || (n->kind == ND_LABEL && n->is_resolved_label)) {
         dead = false;
         if (!gen_stmt(n))
           dead = true;

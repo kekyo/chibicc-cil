@@ -127,6 +127,8 @@ typedef enum {
   ND_RETURN,    // "return"
   ND_IF,        // "if"
   ND_FOR,       // "for" or "while"
+  ND_SWITCH,    // "switch"
+  ND_CASE,      // "case"
   ND_BLOCK,     // { ... }
   ND_GOTO,      // "goto"
   ND_LABEL,     // Labeled statement
@@ -141,7 +143,8 @@ typedef enum {
 // AST node type
 struct Node {
   NodeKind kind; // Node kind
-  int64_t val;   // Used if kind == ND_NUM
+  // Numeric literal
+  int64_t val;
   Node *next;    // Next node
   Type *ty;      // Type, e.g. int or pointer to int
   Token *tok;    // Representative token
@@ -178,8 +181,14 @@ struct Node {
   Node *goto_next;
   bool is_resolved_label;
 
-  Obj *var;      // Used if kind == ND_VAR
+  // Switch-cases
+  Node *case_next;
+  Node *default_case;
 
+  // Variable
+  Obj *var;
+
+  // Sizeof
   Type *sizeof_ty;
 };
 
