@@ -41,6 +41,18 @@ void init_type_system() {
   size4_node->ty = ty_nuint;
   size8_node->ty = ty_nuint;
 
+#ifdef M32
+  sizenint_node->kind = ND_NUM;
+  sizenint_node->val = 4;
+  sizenuint_node->kind = ND_NUM;
+  sizenuint_node->val = 4;
+#elif M64
+  sizenint_node->kind = ND_NUM;
+  sizenint_node->val = 8;
+  sizenuint_node->kind = ND_NUM;
+  sizenuint_node->val = 8;
+#endif
+
   sizenint_node->ty = ty_nuint;
   sizenint_node->sizeof_ty = ty_nint;
   sizenuint_node->ty = ty_nuint;
@@ -96,9 +108,17 @@ Type *pointer_to(Type *base, Token *tok) {
   Type *ty = new_type(TY_PTR);
   ty->base = base;
   ty->is_unsigned = true;
+#ifdef M32
+  ty->size = new_typed_num(4, ty_nint, tok);
+  ty->align = ty->size;
+#elif M64
+  ty->size = new_typed_num(8, ty_nint, tok);
+  ty->align = ty->size;
+#else
   Node *size = new_sizeof(ty, tok);
   ty->size = size;
   ty->align = size;
+#endif
   return ty;
 }
 

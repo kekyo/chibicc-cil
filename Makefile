@@ -1,7 +1,11 @@
 AS=chibias
 CSC=mcs -unsafe+
 
-CFLAGS=-std=c11 -g -fno-common
+MMODEL=
+#MMODEL=-DM32
+#MMODEL=-DM64
+
+CFLAGS=-std=c11 -g -fno-common $(MMODEL)
 ASFLAGS=-f net45 -w x86 -r test/mscorlib.dll
 
 SRCS=$(wildcard *.c)

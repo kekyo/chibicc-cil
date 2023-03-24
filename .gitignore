@@ -3,6 +3,7 @@
 **/*.o
 **/*.s
 **/a.out
+**/mono_crash*
 /tmp*
 /chibicc
 /test/*.exe
