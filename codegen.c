@@ -583,6 +583,18 @@ static bool gen_stmt(Node *node) {
     println("%s:", node->brk_label);
     return true;
   }
+  case ND_DO: {
+    int c = count();
+    println("_L_begin_%d:", c);
+    bool req = gen_stmt(node->then);
+    if (req || node->is_resolved_cont) {
+      println("%s:", node->cont_label);
+      gen_expr(node->cond, false);
+      println("  brtrue _L_begin_%d", c);
+    }
+    println("%s:", node->brk_label);
+    return true;
+  }
   case ND_SWITCH:
     gen_expr(node->cond, true);
     for (Node *n = node->case_next; n; n = n->case_next) {
