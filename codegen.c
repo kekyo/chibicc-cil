@@ -520,7 +520,8 @@ static bool gen_stmt(Node *node) {
       println("  brfalse %s", node->brk_label);
     }
     bool req = gen_stmt(node->then);
-    if (req) {
+    if (req || node->is_resolved_cont) {
+      println("%s:", node->cont_label);
       if (node->inc) {
         gen_expr(node->inc);
         println("  pop");
