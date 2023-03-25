@@ -666,7 +666,7 @@ static void gen_expr(Node *node, bool will_discard) {
     if (!will_discard) {
       gen_expr(node->lhs, false);
       cmp_zero(node->lhs->ty);
-      println("  brtrue.s _L_false_%d", c);
+      println("  brtrue _L_false_%d", c);
       gen_expr(node->rhs, false);
       cmp_zero(node->rhs->ty);
       println("  brtrue.s _L_false_%d", c);
@@ -678,7 +678,7 @@ static void gen_expr(Node *node, bool will_discard) {
     } else {
       gen_expr(node->lhs, false);
       cmp_zero(node->lhs->ty);
-      println("  brtrue.s _L_end_%d", c);
+      println("  brtrue _L_end_%d", c);
       gen_expr(node->rhs, true);
       println("_L_end_%d:", c);
     }
@@ -689,7 +689,7 @@ static void gen_expr(Node *node, bool will_discard) {
     if (!will_discard) {
       gen_expr(node->lhs, false);
       cmp_zero(node->lhs->ty);
-      println("  brfalse.s _L_true_%d", c);
+      println("  brfalse _L_true_%d", c);
       gen_expr(node->rhs, false);
       cmp_zero(node->rhs->ty);
       println("  brfalse.s _L_true_%d", c);
@@ -701,7 +701,7 @@ static void gen_expr(Node *node, bool will_discard) {
     } else {
       gen_expr(node->lhs, false);
       cmp_zero(node->lhs->ty);
-      println("  brfalse.s _L_end_%d", c);
+      println("  brfalse _L_end_%d", c);
       gen_expr(node->rhs, true);
       println("_L_end_%d:", c);
     }
