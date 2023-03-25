@@ -606,7 +606,7 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
   }
 
   if (cur == &head)
-    is_variadic = true;
+    is_variadic = true;   // .NET: See **VARARG**
 
   ty = func_type(ty, ty->tok);
   ty->params = head.next;

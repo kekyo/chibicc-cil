@@ -442,7 +442,7 @@ static void gen_funcall(Node *node, bool will_discard) {
     return;
   }
 
-  if (node->func_ty->is_variadic) {
+  if (node->func_ty->is_variadic && node->func_ty->params) {  // See **VARARG**
     int param_count = 0;
     for (Type *param_ty = node->func_ty->params; param_ty; param_ty = param_ty->next, param_count++);
     int sentinel_count = 0;
@@ -1064,8 +1064,34 @@ static void emit_text(Obj *prog) {
     for (Obj *var = fn->params; var; var = var->next)
       print(" %s:%s", var->name, to_cil_typename(var->ty));
 
+    // HACK: **VARARG**
+    // chibicc-cil handles groups of parameters as follows:
+    // * One or more fixed parameters:
+    //   * Only fixed parameters: Same as general method calls.
+    //   * Included variable parameters: Add an parameter of type `__va_arglist`.
+    // * Empty any fixed parameters:
+    //   * NET standard `vararg` calling convention is used.
+    // A function with empty fixed parameters is treated as a variadic function
+    // by C language spec. (6.7.5.3 Function declarators).
+    // In such a case, if we let the function define `__va_arglist` type parameters,
+    // it is assumed that the function will not define any parameters
+    // by mistake when the function is written in a non-chibicc implementation (such as C#).
+    // (I made a similar mistake several times when porting chibicc.)
+    // So, the `vararg` calling convention is applied only in this case,
+    // so that the caller does not have to worry about more than one argument (`__va_arglist`)
+    // being put on the stack.
+    // The reason for not using the `vararg` calling convention overall is
+    // because the `System.ArgIterator` type used by the caller to implement
+    // the `va_start` and `va_arg` macros for handling variable arguments
+    // is NOT supported by any netstandards.
+    // https://github.com/dotnet/standard/issues/20
     if (fn->ty->is_variadic)
-      print(" C.type.__va_arglist");
+    {
+      if (fn->ty->params)
+        print(" C.type.__va_arglist");
+      else
+        print(" ...");
+    }
 
     println("");
     current_fn = fn;
