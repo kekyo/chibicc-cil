@@ -175,9 +175,6 @@ static void gen_addr(Node *node) {
         // Parameter variable
         println("  ldarga %d", node->var->offset);
         return;
-      default:
-        unreachable();
-        break;
     }
     unreachable();
     return;
@@ -788,6 +785,46 @@ static void gen_expr(Node *node, bool will_discard) {
   error_tok(node->tok, "invalid expression");
 }
 
+static void gen_dummy_value(Type *ty) {
+  switch (ty->kind) {
+  case TY_BOOL:
+  case TY_CHAR:
+  case TY_SHORT:
+  case TY_INT:
+  case TY_ENUM:
+    println("  ldc.i4.0");
+    return;
+  case TY_LONG:
+    println("  ldc.i4.0");
+    println("  conv.i8");
+    return;
+  case TY_FLOAT:
+    println("  ldc.i4.0");
+    println("  conv.r4");
+    return;
+  case TY_DOUBLE:
+    println("  ldc.i4.0");
+    println("  conv.r8");
+    return;
+  case TY_NINT:
+  case TY_PTR:
+  case TY_ARRAY:
+    println("  ldc.i4.0");
+    println("  conv.i");
+    return;
+  case TY_STRUCT:
+  case TY_UNION:
+  case TY_VA_LIST: {
+    const char *type_name = to_cil_typename(ty);
+    println("  sizeof %s", type_name);
+    println("  localloc");
+    println("  ldobj %s", type_name);
+    return;
+  }
+  }
+  unreachable();
+}
+
 // When true is returned, the execution flow continues.
 static bool gen_stmt(Node *node) {
   if (node->tok)
@@ -898,8 +935,16 @@ static bool gen_stmt(Node *node) {
     println("%s:", node->unique_label);
     return gen_stmt(node->lhs);
   case ND_RETURN:
-    if (node->lhs)
-      gen_expr(node->lhs, false);
+    if (node->lhs) {
+      if (current_fn->ty->return_ty->kind != TY_VOID)
+        gen_expr(node->lhs, false);
+      else
+        gen_expr(node->lhs, true);
+    } else {
+      if (current_fn->ty->return_ty->kind != TY_VOID)
+        // Made valid CIL sequence.
+        gen_dummy_value(current_fn->ty->return_ty);
+    }
     println("  br _L_return");
     return false;
   case ND_EXPR_STMT:
@@ -1105,7 +1150,12 @@ static void emit_text(Obj *prog) {
     }
 
     // Emit code
-    gen_stmt(fn->body);
+    bool req = gen_stmt(fn->body);
+    if (req) {
+      if (fn->ty->return_ty->kind != TY_VOID)
+        // Made valid CIL sequence.
+        gen_dummy_value(fn->ty->return_ty);
+    }
 
     // Epilogue
     println("_L_return:");
