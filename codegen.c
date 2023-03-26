@@ -11,6 +11,8 @@ struct UsingType
 };
 
 static UsingType *using_type = NULL;
+static int make_ptr_offset = -1;
+static bool avaliable_ptr_offset = false;
 
 static void gen_expr(Node *node, bool will_discard);
 static bool gen_stmt(Node *node);
@@ -155,6 +157,16 @@ static const char *to_cil_typename(Type *ty) {
   unreachable();
 }
 
+// Made native pointer when managed pointer store into it.
+static void gen_make_ptr() {
+  if (!avaliable_ptr_offset) {
+    println("  .local void*");
+    avaliable_ptr_offset = true;
+  }
+  println("  stloc %d", make_ptr_offset);
+  println("  ldloc %d", make_ptr_offset);
+}
+
 // Compute the absolute address of a given node.
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
@@ -211,6 +223,7 @@ static void load(Type *ty) {
       // becomes not the array itself but the address of the array.
       // This is where "array is automatically converted to a pointer to
       // the first element of the array in C" occurs.
+      gen_make_ptr();
       return;
     case TY_STRUCT:
     case TY_UNION:
@@ -525,6 +538,9 @@ static void gen_expr(Node *node, bool will_discard) {
   case ND_NUM:
     if (!will_discard) {
       switch (node->ty->kind) {
+        case TY_BOOL:
+          println("  ldc.i4.%d", node->val ? 1 : 0);
+          return;
         case TY_CHAR:
         case TY_SHORT:
         case TY_INT:
@@ -1090,6 +1106,9 @@ static void emit_data(Obj *prog) {
     
     if (var->init_expr) {
       println(".initializer public");
+        make_ptr_offset = 0;
+        avaliable_ptr_offset = false;
+
         gen_expr(var->init_expr, true);
         println("  ret");
     }
@@ -1142,11 +1161,14 @@ static void emit_text(Obj *prog) {
     current_fn = fn;
 
     // Prologue
+    make_ptr_offset = 0;
+    avaliable_ptr_offset = false;
     for (Obj *var = fn->locals; var; var = var->next) {
       if (var->name[0] != '\0')
         println("  .local %s %s", to_cil_typename(var->ty), var->name);
       else
         println("  .local %s", to_cil_typename(var->ty));
+      make_ptr_offset++;
     }
 
     // Emit code
