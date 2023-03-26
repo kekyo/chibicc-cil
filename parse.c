@@ -1452,11 +1452,11 @@ static int64_t eval(Node *node) {
   case ND_BITXOR:
     return eval(node->lhs) ^ eval(node->rhs);
   case ND_SHL:
-    return eval(node->lhs) << eval(node->rhs);
+    return eval(node->lhs) << (int32_t)eval(node->rhs);
   case ND_SHR:
     if (node->ty->is_unsigned)
-      return (uint64_t)eval(node->lhs) >> eval(node->rhs);
-    return eval(node->lhs) >> eval(node->rhs);
+      return (uint64_t)eval(node->lhs) >> (int32_t)eval(node->rhs);
+    return eval(node->lhs) >> (int32_t)eval(node->rhs);
   case ND_EQ:
     return eval(node->lhs) == eval(node->rhs);
   case ND_NE:

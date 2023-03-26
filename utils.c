@@ -591,12 +591,12 @@ static Node *reduce(Node *node) {
     case ND_BITXOR:
       return new_typed_num(get_by_integer(lhs) ^ get_by_integer(rhs), node->ty, node->tok);
     case ND_SHL:
-      return new_typed_num(get_by_integer(lhs) << get_by_integer(rhs), node->ty, node->tok);
+      return new_typed_num(get_by_integer(lhs) << (int32_t)get_by_integer(rhs), node->ty, node->tok);
     case ND_SHR:
       if (node->ty->is_unsigned)
-        return new_typed_num((uint64_t)get_by_integer(lhs) >> get_by_integer(rhs), node->ty, node->tok);
+        return new_typed_num((uint64_t)get_by_integer(lhs) >> (int32_t)get_by_integer(rhs), node->ty, node->tok);
       else
-        return new_typed_num(get_by_integer(lhs) >> get_by_integer(rhs), node->ty, node->tok);
+        return new_typed_num(get_by_integer(lhs) >> (int32_t)get_by_integer(rhs), node->ty, node->tok);
     case ND_EQ:
       return new_typed_num(get_by_integer(lhs) == get_by_integer(rhs) ? 1 : 0, node->ty, node->tok);
     case ND_NE:
