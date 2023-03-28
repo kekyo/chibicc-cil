@@ -81,7 +81,7 @@ int main() {
   0.0;
   1.0;
   3e+8;
-  0x10.1p0;
+  //0x10.1p0;   // Omitted for libc-bootstrap.
   .1E4f;
 
   ASSERT(4, sizeof(8f));
