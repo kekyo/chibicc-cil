@@ -300,17 +300,24 @@ static Obj *new_gvar(char *name, Type *ty) {
   return var;
 }
 
-static char *new_unique_name(void) {
+static char *new_unique_name(const char *name) {
   static int id = 0;
-  return format("_L__%d", id++);
+  char *p = strndup(name, 20);
+  char *pc = p;
+  while (*pc != 0) {
+    if (!(isalpha(*pc) || isdigit(*pc)))
+      *pc = '_';
+      pc++;
+  }
+  return format("_L%d$_%s", id++, p);
 }
 
-static Obj *new_anon_gvar(Type *ty) {
-  return new_gvar(new_unique_name(), ty);
+static Obj *new_anon_gvar(Type *ty, const char *name) {
+  return new_gvar(new_unique_name(name), ty);
 }
 
 static Obj *new_string_literal(char *p, Type *ty) {
-  Obj *var = new_anon_gvar(ty);
+  Obj *var = new_anon_gvar(ty, p);
   var->init_data = p;
   if (ty->kind == TY_ARRAY)
     var->init_data_size = ty->array_len;
@@ -320,7 +327,7 @@ static Obj *new_string_literal(char *p, Type *ty) {
 }
 
 static Obj *new_raw_data_literal(char *p, int size, Type *ty) {
-  Obj *var = new_anon_gvar(ty);
+  Obj *var = new_anon_gvar(ty, p);
   var->init_data = p;
   var->init_data_size = size;
   return var;
@@ -803,7 +810,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr) 
 
     if (attr && attr->is_static) {
       // static local variable
-      Obj *var = new_anon_gvar(ty);
+      Obj *var = new_anon_gvar(ty, "slvar");
       push_scope(get_ident(ty->name))->var = var;
       if (equal(tok, "="))
         gvar_initializer(&tok, tok->next, var);
@@ -1199,7 +1206,7 @@ static Node *stmt(Token **rest, Token *tok) {
     current_switch = node;
 
     char *brk = brk_label;
-    brk_label = node->brk_label = new_unique_name();
+    brk_label = node->brk_label = new_unique_name("switch_break");
 
     node->then = stmt(rest, tok);
 
@@ -1215,7 +1222,7 @@ static Node *stmt(Token **rest, Token *tok) {
     Node *node = new_node(ND_CASE, tok);
     int val = const_expr(&tok, tok->next);
     tok = skip(tok, ":");
-    node->label = new_unique_name();
+    node->label = new_unique_name(format("switch_case_%d", val));
     node->lhs = stmt(rest, tok);
     node->val = val;
     node->case_next = current_switch->case_next;
@@ -1229,7 +1236,7 @@ static Node *stmt(Token **rest, Token *tok) {
 
     Node *node = new_node(ND_CASE, tok);
     tok = skip(tok->next, ":");
-    node->label = new_unique_name();
+    node->label = new_unique_name("switch_default");
     node->lhs = stmt(rest, tok);
     current_switch->default_case = node;
     return node;
@@ -1243,8 +1250,8 @@ static Node *stmt(Token **rest, Token *tok) {
 
     char *brk = brk_label;
     Node *cont = cont_target;
-    brk_label = node->brk_label = new_unique_name();
-    node->cont_label = new_unique_name();
+    brk_label = node->brk_label = new_unique_name("for_break");
+    node->cont_label = new_unique_name("for_continue");
     cont_target = node;
 
     if (is_typename(tok)) {
@@ -1278,8 +1285,8 @@ static Node *stmt(Token **rest, Token *tok) {
 
     char *brk = brk_label;
     Node *cont = cont_target;
-    brk_label = node->brk_label = new_unique_name();
-    node->cont_label = new_unique_name();
+    brk_label = node->brk_label = new_unique_name("while_break");
+    node->cont_label = new_unique_name("while_continue");
     cont_target = node;
 
     node->then = stmt(rest, tok);
@@ -1294,8 +1301,8 @@ static Node *stmt(Token **rest, Token *tok) {
 
     char *brk = brk_label;
     Node *cont = cont_target;
-    brk_label = node->brk_label = new_unique_name();
-    node->cont_label = new_unique_name();
+    brk_label = node->brk_label = new_unique_name("do_break");
+    node->cont_label = new_unique_name("do_continue");
     cont_target = node;
 
     node->then = stmt(&tok, tok->next);
@@ -1342,7 +1349,7 @@ static Node *stmt(Token **rest, Token *tok) {
   if (tok->kind == TK_IDENT && equal(tok->next, ":")) {
     Node *node = new_node(ND_LABEL, tok);
     node->label = strndup(tok->loc, tok->len);
-    node->unique_label = new_unique_name();
+    node->unique_label = new_unique_name(node->label);
     node->lhs = stmt(rest, tok->next->next);
     node->goto_next = labels;
     labels = node;
@@ -2134,7 +2141,7 @@ static Node *postfix(Token **rest, Token *tok) {
     tok = skip(tok, ")");
 
     if (scope->next == NULL) {
-      Obj *var = new_anon_gvar(ty);
+      Obj *var = new_anon_gvar(ty, "gvar");
       gvar_initializer(rest, tok, var);
       return new_var_node(var, start);
     }
