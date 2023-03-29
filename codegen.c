@@ -110,6 +110,7 @@ static void make_public_type(Type *ty) {
 }
 
 static const char *to_cil_typename(Type *ty) {
+
   switch (ty->kind) {
     case TY_VOID:
       return "void";
@@ -129,30 +130,42 @@ static const char *to_cil_typename(Type *ty) {
       return "float32";
     case TY_DOUBLE:
       return "float64";
-    case TY_ARRAY:
-      if (ty->array_len >= 1)
-        return format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
-      else
-        // Flexible array (0) / Unapplied size array (-1)
-        return format("%s[*]", to_cil_typename(ty->base));
-    case TY_PTR:
-      return format("%s*", to_cil_typename(ty->base));
-    case TY_ENUM:
-    case TY_STRUCT:
-    case TY_UNION:
-      if (ty->tag_scope)
-        return ty->is_public ?
-          ty->tag_scope->name :
-          format("@%s_%p", ty->tag_scope->name, ty);
-      else if (ty->typedef_name) {
-        const char *name = get_string(ty->typedef_name);
-        return ty->is_public ?
-          name :
-          format("@%s_%p", name, ty);
-      } else
-        return format("@tag_%p", ty);
     case TY_VA_LIST:
       return "va_list";
+  }
+
+  if (ty->cil_name)
+    return ty->cil_name;
+
+  switch (ty->kind) {
+    case TY_ARRAY: {
+      if (ty->array_len >= 1)
+        ty->cil_name = format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
+      else
+        // Flexible array (0) / Unapplied size array (-1)
+        ty->cil_name = format("%s[*]", to_cil_typename(ty->base));
+      return ty->cil_name;
+    }
+    case TY_PTR: {
+      ty->cil_name = format("%s*", to_cil_typename(ty->base));
+      return ty->cil_name;
+    }
+    case TY_ENUM:
+    case TY_STRUCT:
+    case TY_UNION: {
+      if (ty->tag_scope)
+        ty->cil_name = ty->is_public ?
+          ty->tag_scope->name :
+          format("_%s_$%d", ty->tag_scope->name, count());
+      else if (ty->typedef_name) {
+        char *name = get_string(ty->typedef_name);
+        ty->cil_name = ty->is_public ?
+          name :
+          format("_%s_$%d", name, count());
+      } else
+        ty->cil_name =  format("_tag_$%d", count());
+      return ty->cil_name;
+    }
   }
   unreachable();
 }

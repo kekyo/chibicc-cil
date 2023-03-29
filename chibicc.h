@@ -318,7 +318,9 @@ struct Type {
   bool is_variadic;
   Type *next;
 
+  // CIL specific
   bool is_public;
+  char *cil_name;
 };
 
 // Enum member
