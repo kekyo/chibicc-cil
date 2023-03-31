@@ -1134,12 +1134,20 @@ static void emit_text(Obj *prog) {
       continue;
 
     if (fn->is_static)
-      print(".function file %s %s", to_cil_typename(fn->ty->return_ty), fn->name);
+      print(".function file");
     else
-      print(".function public %s %s", to_cil_typename(fn->ty->return_ty), fn->name);
-    
-    for (Obj *var = fn->params; var; var = var->next)
-      print(" %s:%s", var->name, to_cil_typename(var->ty));
+      print(".function public");
+
+    print(" %s(", to_cil_typename(fn->ty->return_ty));
+ 
+    bool first = true;
+    for (Obj *var = fn->params; var; var = var->next) {
+      if (first)
+        print("%s:%s", var->name, to_cil_typename(var->ty));
+      else
+        print(",%s:%s", var->name, to_cil_typename(var->ty));
+      first = false;
+    }
 
     // HACK: **VARARG**
     // chibicc-cil handles groups of parameters as follows:
@@ -1164,13 +1172,15 @@ static void emit_text(Obj *prog) {
     // https://github.com/dotnet/standard/issues/20
     if (fn->ty->is_variadic)
     {
+      if (!first)
+        print(",");
       if (fn->ty->params)
-        print(" C.type.__va_arglist");
+        print("C.type.__va_arglist");
       else
-        print(" ...");
+        print("...");
     }
 
-    println("");
+    println(") %s", fn->name);
     current_fn = fn;
 
     // Prologue
