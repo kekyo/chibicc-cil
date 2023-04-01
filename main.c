@@ -1,5 +1,6 @@
 #include "chibicc.h"
 
+static MemoryModel opt_mm = AnyCPU;
 static char *opt_o;
 
 static char *input_path;
@@ -13,6 +14,26 @@ static void parse_args(int argc, char **argv) {
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--help"))
       usage(0);
+
+    if (!strcmp(argv[i], "-march=any")) {
+      opt_mm = AnyCPU;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-march=m32")) {
+      opt_mm = M32;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-march=m64")) {
+      opt_mm = M64;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-march=native")) {
+      opt_mm = sizeof(void*) == 8 ? M64 : M32;
+      continue;
+    }
 
     if (!strcmp(argv[i], "-o")) {
       if (!argv[++i])
@@ -49,7 +70,7 @@ static FILE *open_file(char *path) {
 int main(int argc, char **argv) {
   parse_args(argc, argv);
 
-  init_type_system();
+  init_type_system(opt_mm);
 
   // Tokenize and parse.
   Token *tok = tokenize_file(input_path);

@@ -1,5 +1,7 @@
 #include "chibicc.h"
 
+static MemoryModel mem_model;
+
 static Node *size0_node = &(Node){ND_NUM, 0};
 static Node *size1_node = &(Node){ND_NUM, 1};
 static Node *size2_node = &(Node){ND_NUM, 2};
@@ -34,29 +36,37 @@ static void init_type(Type *ty, Node *sz, bool is_unsigned) {
   ty->is_unsigned = is_unsigned;
 }
 
-void init_type_system() {
+void init_type_system(MemoryModel mm) {
+  mem_model = mm;
+
   size0_node->ty = ty_nuint;
   size1_node->ty = ty_nuint;
   size2_node->ty = ty_nuint;
   size4_node->ty = ty_nuint;
   size8_node->ty = ty_nuint;
 
-#ifdef M32
-  sizenint_node->kind = ND_NUM;
-  sizenint_node->val = 4;
-  sizenuint_node->kind = ND_NUM;
-  sizenuint_node->val = 4;
-#elif M64
-  sizenint_node->kind = ND_NUM;
-  sizenint_node->val = 8;
-  sizenuint_node->kind = ND_NUM;
-  sizenuint_node->val = 8;
-#endif
+  switch (mem_model) {
+  case M32:
+    sizenint_node->kind = ND_NUM;
+    sizenint_node->val = 4;
+    sizenuint_node->kind = ND_NUM;
+    sizenuint_node->val = 4;
+    break;
+  case M64:
+    sizenint_node->kind = ND_NUM;
+    sizenint_node->val = 8;
+    sizenuint_node->kind = ND_NUM;
+    sizenuint_node->val = 8;
+    break;
+  default:
+    sizenint_node->kind = ND_SIZEOF;
+    sizenint_node->sizeof_ty = ty_nint;
+    sizenuint_node->kind = ND_SIZEOF;
+    sizenuint_node->sizeof_ty = ty_nuint;
+  }
 
-  sizenint_node->ty = ty_nuint;
-  sizenint_node->sizeof_ty = ty_nint;
-  sizenuint_node->ty = ty_nuint;
-  sizenuint_node->sizeof_ty = ty_nuint;
+  sizenint_node->ty = ty_nuint;    // size_t
+  sizenuint_node->ty = ty_nuint;   // size_t
 
   init_type(ty_void, size1_node, false);
   init_type(ty_bool, size1_node, true);
@@ -108,17 +118,20 @@ Type *pointer_to(Type *base, Token *tok) {
   Type *ty = new_type(TY_PTR);
   ty->base = base;
   ty->is_unsigned = true;
-#ifdef M32
-  ty->size = new_typed_num(4, ty_nint, tok);
-  ty->align = ty->size;
-#elif M64
-  ty->size = new_typed_num(8, ty_nint, tok);
-  ty->align = ty->size;
-#else
-  Node *size = new_sizeof(ty, tok);
-  ty->size = size;
-  ty->align = size;
-#endif
+  switch (mem_model) {
+  case M32:
+    ty->size = new_typed_num(4, ty_nint, tok);
+    ty->align = ty->size;
+    break;
+  case M64:
+    ty->size = new_typed_num(8, ty_nint, tok);
+    ty->align = ty->size;
+    break;
+  default:
+    ty->size = new_sizeof(ty, tok);
+    ty->align = ty->size;
+    break;
+  }
   return ty;
 }
 

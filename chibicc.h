@@ -361,7 +361,13 @@ extern Type *ty_nuint;
 extern Type *ty_float;
 extern Type *ty_double;
 
-void init_type_system();
+typedef enum MemoryModel {
+  AnyCPU,
+  M32,
+  M64,
+} MemoryModel;
+
+void init_type_system(MemoryModel mm);
 
 bool is_integer(Type *ty);
 bool is_flonum(Type *ty);

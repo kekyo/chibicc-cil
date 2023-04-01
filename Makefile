@@ -1,10 +1,11 @@
 AS=chibias
 
-MMODEL=
-#MMODEL=-DM32
-#MMODEL=-DM64
+CCFLAGS=-march=any
+#CCFLAGS=-march=m32
+#CCFLAGS=-march=m64
+#CCFLAGS=-march=native
 
-CFLAGS=-std=c11 -g -fno-common $(MMODEL)
+CFLAGS=-std=c11 -g -fno-common
 ASFLAGS=-f net45 -w x86 -r test/mscorlib.dll
 
 SRCS=$(wildcard *.c)
@@ -23,11 +24,11 @@ test/libc-bootstrap.dll: ../libc-cil/libc-bootstrap/bin/Debug/net45/libc-bootstr
 
 test/common.s: chibicc test/common test/test.h
 	$(CC) -o- -E -P -C -xc test/common > test/common.cp
-	./chibicc -o $@ test/common.cp
+	./chibicc $(CCFLAGS) -o $@ test/common.cp
 
 test/%.exe: chibicc test/%.c test/test.h test/common.s test/libc-bootstrap.dll
 	$(CC) -o- -E -P -C test/$*.c > test/$*.cp
-	./chibicc -o test/$*.s test/$*.cp
+	./chibicc $(CCFLAGS) -o test/$*.s test/$*.cp
 	$(AS) $(ASFLAGS) -r test/libc-bootstrap.dll -o $@ test/$*.s test/common.s
 
 test: $(TESTS)
