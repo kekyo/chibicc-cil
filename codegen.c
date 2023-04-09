@@ -1046,7 +1046,8 @@ static void emit_type(Obj *prog) {
           else if (last_offset->kind == ND_NUM) {
             int64_t pad_start = last_offset->val + last_size->val;
             int64_t pad_size = mem->offset->val - pad_start;
-            println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
+            if (pad_size >= 1)
+              println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
             println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
           } else
             unreachable();
@@ -1060,7 +1061,8 @@ static void emit_type(Obj *prog) {
           else if (last_offset->kind == ND_NUM) {
             int64_t pad_start = last_offset->val + last_size->val;
             int64_t pad_size = ty->size->val - pad_start;
-            println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
+            if (pad_size >= 1)
+              println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
           } else
             unreachable();
         }
@@ -1074,7 +1076,7 @@ static void emit_type(Obj *prog) {
         if (!equals_node(ty->size, ty->origin_size)) {
           if (ty->size->kind != ND_NUM)
             error_tok(ty->name, "Could not adjust on alignment this type.");
-          else
+          else if (ty->size->val >= 1)
             println("  internal uint8[%ld] $pad_$0 0", ty->size->val);
         }
         break;
