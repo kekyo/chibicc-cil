@@ -80,5 +80,6 @@ int main(int argc, char **argv) {
   FILE *out = open_file(opt_o);
   fprintf(out, ".file 1 \"%s\" c\n", input_path);
   codegen(prog, out);
+  fflush(out);
   return 0;
 }
