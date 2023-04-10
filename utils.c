@@ -15,14 +15,14 @@ static int calculate_size(Type *ty) {
   return -1;
 }
 
-Node *align_to_node(Node *n, Node *align, Token *tok) {
+Node *align_to_node(Node *n, Node *align) {
   // (n + align - 1) / align * align;
   Node *next = new_binary(
-    ND_SUB, new_binary(ND_ADD, n, align, tok), new_num(1, tok), tok);
+    ND_SUB, new_binary(ND_ADD, n, align, NULL), new_num(1, NULL), NULL);
   Node *based = new_binary(
-    ND_DIV, next, align, tok);
+    ND_DIV, next, align, NULL);
   return new_binary(
-    ND_MUL, based, align, tok);
+    ND_MUL, based, align, NULL);
 }
 
 static char *pretty_print(Node *node) {

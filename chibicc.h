@@ -385,7 +385,7 @@ void add_type(Node *node);
 // utils.c
 //
 
-Node *align_to_node(Node *n, Node *align, Token *tok);
+Node *align_to_node(Node *n, Node *align);
 void pretty_print_node(Node *node);
 bool equals_type(Type *lhs, Type *rhs);
 bool equals_node(Node *lhs, Node *rhs);

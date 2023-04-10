@@ -208,9 +208,7 @@ static Node *new_var_node(Obj *var, Token *tok) {
 Node *new_cast(Node *expr, Type *ty) {
   add_type(expr);
 
-  Node *node = calloc(1, sizeof(Node));
-  node->kind = ND_CAST;
-  node->tok = expr->tok;
+  Node *node = new_node(ND_CAST, expr->tok);
   node->lhs = expr;
   node->ty = copy_type(ty);
   return node;
@@ -2015,11 +2013,11 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
   return ty;
 }
 
-static Node *max_node(Node *lhs, Node *rhs, Token *tok)
+static Node *max_node(Node *lhs, Node *rhs)
 {
     // cond = lhs < rhs ? rhs : lhs
-    Node *cond = new_node(ND_COND, tok);
-    cond->cond = new_binary(ND_LT, lhs, rhs, tok);
+    Node *cond = new_node(ND_COND, NULL);
+    cond->cond = new_binary(ND_LT, lhs, rhs, NULL);
     cond->then = rhs;
     cond->els = lhs;
     return cond;
@@ -2034,35 +2032,35 @@ static Type *struct_decl(Token **rest, Token *tok) {
     return ty;
 
   // Assign offsets within the struct to members.
-  Node *node0 = new_typed_num(0, ty_nuint, tok);   // (size_t)0
-  Node *node1 = new_typed_num(1, ty_nuint, tok);   // (size_t)1
+  Node *node0 = new_typed_num(0, ty_nuint, NULL);   // (size_t)0
+  Node *node1 = new_typed_num(1, ty_nuint, NULL);   // (size_t)1
   Node *offset = node0;
   Node *align = node1;
   Node *origin_align = node1;
 
   for (Member *mem = ty->members; mem; mem = mem->next) {
     // mem->origin_offset = align_to(offset, mem->ty->align)
-    mem->origin_offset = reduce_node(align_to_node(offset, mem->ty->align, tok));
+    mem->origin_offset = reduce_node(align_to_node(offset, mem->ty->align));
     // offset = align_to(offset, mem->align)
-    offset = reduce_node(align_to_node(offset, mem->align, tok));
+    offset = reduce_node(align_to_node(offset, mem->align));
 
     mem->offset = offset;
 
     // offset = offset + mem->ty->size
-    offset = reduce_node(new_binary(ND_ADD, offset, mem->ty->size, tok));
+    offset = reduce_node(new_binary(ND_ADD, offset, mem->ty->size, NULL));
 
     // origin_align = max(origin_align, mem->ty->align)
-    origin_align = reduce_node(max_node(origin_align, mem->ty->align, tok));
+    origin_align = reduce_node(max_node(origin_align, mem->ty->align));
     // align = max(align, mem->align)
-    align = reduce_node(max_node(align, mem->align, tok));
+    align = reduce_node(max_node(align, mem->align));
   }
 
   ty->align = reduce_node(align);
 
   // ty->size = align_to(offset, ty->align)
-  ty->size = reduce_node(align_to_node(offset, ty->align, tok));
+  ty->size = reduce_node(align_to_node(offset, ty->align));
   // ty->origin_size = align_to(offset, origin_align)
-  ty->origin_size = reduce_node(align_to_node(offset, origin_align, tok));
+  ty->origin_size = reduce_node(align_to_node(offset, origin_align));
 
   return ty;
 }
@@ -2076,8 +2074,8 @@ static Type *union_decl(Token **rest, Token *tok) {
     return ty;
 
   // We need to compute the alignment and the size though.
-  Node *node0 = new_typed_num(0, ty_nuint, tok);   // (size_t)0
-  Node *node1 = new_typed_num(1, ty_nuint, tok);   // (size_t)1
+  Node *node0 = new_typed_num(0, ty_nuint, NULL);   // (size_t)0
+  Node *node1 = new_typed_num(1, ty_nuint, NULL);   // (size_t)1
   Node *size = node0;
   Node *align = node1;
   Node *origin_align = node1;
@@ -2088,19 +2086,19 @@ static Type *union_decl(Token **rest, Token *tok) {
     mem->origin_offset = node0;
 
     // align = max(align, mem->align)
-    align = reduce_node(max_node(align, mem->align, tok));
+    align = reduce_node(max_node(align, mem->align));
     // origin_align = max(origin_align, mem->ty->align)
-    origin_align = reduce_node(max_node(origin_align, mem->ty->align, tok));
+    origin_align = reduce_node(max_node(origin_align, mem->ty->align));
     // size = max(size, mem->ty->size)
-    size = reduce_node(max_node(size, mem->ty->size, tok));
+    size = reduce_node(max_node(size, mem->ty->size));
   }
 
   ty->align = reduce_node(align);
 
   // ty->origin_size = align_to(size, origin_align)
-  ty->origin_size = reduce_node(align_to_node(size, origin_align, tok));
+  ty->origin_size = reduce_node(align_to_node(size, origin_align));
   // ty->size = align_to(size, ty->align)
-  ty->size = reduce_node(align_to_node(size, ty->align, tok));
+  ty->size = reduce_node(align_to_node(size, ty->align));
 
   return ty;
 }
