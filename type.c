@@ -9,6 +9,7 @@ static Node *size4_node = &(Node){ND_NUM, 4};
 static Node *size8_node = &(Node){ND_NUM, 8};
 static Node *sizenint_node = &(Node){ND_SIZEOF, 0};
 static Node *sizenuint_node = &(Node){ND_SIZEOF, 0};
+static Node *sizevalist_node = &(Node){ND_SIZEOF, 0};
 
 Type *ty_void = &(Type){TY_VOID};
 Type *ty_bool = &(Type){TY_BOOL};
@@ -28,6 +29,8 @@ Type *ty_nuint = &(Type){TY_NINT};
 
 Type *ty_float = &(Type){TY_FLOAT};
 Type *ty_double = &(Type){TY_DOUBLE};
+
+Type *ty_va_list = &(Type){TY_VA_LIST};
 
 static void init_type(Type *ty, Node *sz, bool is_unsigned) {
   ty->size = sz;
@@ -68,6 +71,9 @@ void init_type_system(MemoryModel mm) {
   sizenint_node->ty = ty_nuint;    // size_t
   sizenuint_node->ty = ty_nuint;   // size_t
 
+  sizevalist_node->kind = ND_SIZEOF;
+  sizevalist_node->sizeof_ty = ty_va_list;
+
   init_type(ty_void, size1_node, false);
   init_type(ty_bool, size1_node, true);
 
@@ -86,6 +92,12 @@ void init_type_system(MemoryModel mm) {
 
   init_type(ty_float, size4_node, false);
   init_type(ty_double, size8_node, false);
+
+  init_type(ty_va_list, sizenuint_node, true);
+
+  ty_va_list->size = sizevalist_node;
+  ty_va_list->align = size8_node;
+  ty_va_list->origin_size = sizevalist_node;
 }
 
 static Type *new_type(TypeKind kind) {
@@ -136,8 +148,7 @@ Type *pointer_to(Type *base, Token *tok) {
 }
 
 Type *func_type(Type *return_ty, Token *tok) {
-  Type *ty = calloc(1, sizeof(Type));
-  ty->kind = TY_FUNC;
+  Type *ty = new_type(TY_FUNC);
   ty->return_ty = return_ty;
   ty->tok = tok;
   return ty;
@@ -165,14 +176,6 @@ Type *struct_type(Token *tok) {
   Type *ty = new_type(TY_STRUCT);
   ty->align = size1_node;
   ty->size = size0_node;
-  ty->tok = tok;
-  return ty;
-}
-
-Type *va_list_type(Token *tok) {
-  Type *ty = new_type(TY_VA_LIST);
-  ty->align = size8_node;   // TODO:
-  ty->size = new_sizeof(ty, tok);
   ty->tok = tok;
   return ty;
 }

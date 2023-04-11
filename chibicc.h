@@ -361,6 +361,8 @@ extern Type *ty_nuint;
 extern Type *ty_float;
 extern Type *ty_double;
 
+extern Type *ty_va_list;
+
 typedef enum MemoryModel {
   AnyCPU,
   M32,
@@ -378,7 +380,6 @@ Type *func_type(Type *return_ty, Token *tok);
 Type *array_of(Type *base, int size, Token *tok);
 Type *enum_type(Token *tok);
 Type *struct_type(Token *tok);
-Type *va_list_type(Token *tok);
 void add_type(Node *node);
 
 //

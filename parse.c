@@ -456,7 +456,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     if (equal(tok, "__builtin_va_list")) {
       if (counter)
         break;
-      ty = va_list_type(tok);
+      ty = ty_va_list;
       tok = tok->next;
       break;
     }
