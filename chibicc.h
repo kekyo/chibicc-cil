@@ -387,7 +387,11 @@ void add_type(Node *node);
 //
 
 Node *align_to_node(Node *n, Node *align);
+char *to_cil_typename(Type *ty);
 void pretty_print_node(Node *node);
+void pretty_print_obj(Obj *obj);
+void verify_type(Type *ty);
+void verify_node(Node *node);
 bool equals_type(Type *lhs, Type *rhs);
 bool equals_node(Node *lhs, Node *rhs);
 Node *reduce_node(Node *node);

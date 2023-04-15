@@ -109,67 +109,6 @@ static void make_public_type(Type *ty) {
   }
 }
 
-static const char *to_cil_typename(Type *ty) {
-
-  switch (ty->kind) {
-    case TY_VOID:
-      return "void";
-    case TY_BOOL:
-      return "bool";
-    case TY_CHAR:
-      return ty->is_unsigned ? "uint8" : "int8";
-    case TY_SHORT:
-      return ty->is_unsigned ? "uint16" : "int16";
-    case TY_INT:
-      return ty->is_unsigned ? "uint32" : "int32";
-    case TY_LONG:
-      return ty->is_unsigned ? "uint64" : "int64";
-    case TY_NINT:
-      return ty->is_unsigned ? "nuint" : "nint";
-    case TY_FLOAT:
-      return "float32";
-    case TY_DOUBLE:
-      return "float64";
-    case TY_VA_LIST:
-      return "va_list";
-  }
-
-  if (ty->cil_name)
-    return ty->cil_name;
-
-  switch (ty->kind) {
-    case TY_ARRAY: {
-      if (ty->array_len >= 1)
-        ty->cil_name = format("%s[%d]", to_cil_typename(ty->base), ty->array_len);
-      else
-        // Flexible array (0) / Unapplied size array (-1)
-        ty->cil_name = format("%s[*]", to_cil_typename(ty->base));
-      return ty->cil_name;
-    }
-    case TY_PTR: {
-      ty->cil_name = format("%s*", to_cil_typename(ty->base));
-      return ty->cil_name;
-    }
-    case TY_ENUM:
-    case TY_STRUCT:
-    case TY_UNION: {
-      if (ty->tag_scope)
-        ty->cil_name = ty->is_public ?
-          ty->tag_scope->name :
-          format("_%s_$%d", ty->tag_scope->name, count());
-      else if (ty->typedef_name) {
-        char *name = get_string(ty->typedef_name);
-        ty->cil_name = ty->is_public ?
-          name :
-          format("_%s_$%d", name, count());
-      } else
-        ty->cil_name =  format("_tag_$%d", count());
-      return ty->cil_name;
-    }
-  }
-  unreachable();
-}
-
 // Made native pointer when managed pointer store into it.
 static void gen_make_ptr() {
   if (!avaliable_ptr_offset) {
