@@ -190,7 +190,7 @@ static void gen_addr(Node *node) {
     switch (node->var->kind) {
       case OB_GLOBAL:
         // Global variable
-        println("  ldsflda %s", node->var->name);
+        println("  ldsfld %s", node->var->name);
         return;
       case OB_LOCAL:
         // Local variable
@@ -536,6 +536,32 @@ static void gen_funcall(Node *node, bool will_discard) {
   }
 }
 
+static void gen_sizeof(Type *ty) {
+  switch (ty->kind) {
+    case TY_STRUCT:
+      // Struct size with flexible array will be calculated invalid size by sizeof opcode.
+      if (ty->is_flexible) {
+        aggregate_type(ty);
+        gen_expr(ty->size, false);
+        return;
+      }
+      break;
+    case TY_ARRAY:
+      // Flexible array will be calculated invalid size by sizeof opcode.
+      if (ty->array_len == 0) {
+        aggregate_type(ty);
+        println("  ldc.i4.0");
+        println("  conv.u");   // Cast to size_t
+        return;
+      } else if (ty->array_len < 0)
+        unreachable();
+      break;
+  }
+  println("  sizeof %s", to_cil_typename(ty));
+  println("  conv.u");   // Cast to size_t
+  aggregate_type(ty);
+}
+
 // If will_discard is true, the result must be discarded.
 static void gen_expr(Node *node, bool will_discard) {
   if (node->tok)
@@ -600,31 +626,8 @@ static void gen_expr(Node *node, bool will_discard) {
       gen_addr(node->lhs);
     return;
   case ND_SIZEOF:
-    if (!will_discard) {
-      switch (node->sizeof_ty->kind) {
-        case TY_STRUCT:
-          // Struct size with flexible array will be calculated invalid size by sizeof opcode.
-          if (node->sizeof_ty->is_flexible) {
-            aggregate_type(node->sizeof_ty);
-            gen_expr(node->sizeof_ty->size, false);
-            return;
-          }
-          break;
-        case TY_ARRAY:
-          // Flexible array will be calculated invalid size by sizeof opcode.
-          if (node->sizeof_ty->array_len == 0) {
-            aggregate_type(node->sizeof_ty);
-            println("  ldc.i4.0");
-            println("  conv.u");   // Cast to size_t
-            return;
-          } else if (node->sizeof_ty->array_len < 0)
-            unreachable();
-          break;
-      }
-      println("  sizeof %s", to_cil_typename(node->sizeof_ty));
-      println("  conv.u");   // Cast to size_t
-      aggregate_type(node->sizeof_ty);
-    }
+    if (!will_discard)
+      gen_sizeof(node->sizeof_ty);
     return;
   case ND_ASSIGN:
     gen_addr(node->lhs);
@@ -1100,32 +1103,93 @@ static void assign_lvar_offsets(Obj *prog) {
   }
 }
 
+static void emit_data_alloc(Obj *var) {
+  println("  ldc.i4.1");
+  println("  conv.u");
+
+  if (var->ty->size->kind == ND_NUM) {
+    println("  ldc.i8 %ld", var->ty->size->val);
+    println("  conv.u");
+  } else
+    gen_sizeof(var->ty);
+
+  println("  call calloc");
+  println("  stsfld %s", var->name);
+}
+
+static void emit_data_init(Obj *var) {
+  const char *ty_name = to_cil_typename(var->ty);
+
+  if (var->init_data) {
+    println("  ldsfld %s", var->name);
+    println("  ldsflda _const_$%s", var->name);
+    println("  ldobj %s", ty_name);
+    println("  stobj %s", ty_name);
+  }
+
+  if (var->init_expr) {
+    make_ptr_offset = 0;
+    avaliable_ptr_offset = false;
+
+    gen_expr(var->init_expr, true);
+  }
+}
+
 static void emit_data(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
     if (var->is_function || !var->is_definition)
       continue;
 
-    if (var->is_static)
-      print(".global file %s %s", to_cil_typename(var->ty), var->name);
-    else
-      print(".global public %s %s", to_cil_typename(var->ty), var->name);
+    const char *ty_name = to_cil_typename(var->ty);
 
     if (var->init_data) {
+      // TODO: Apply constant
+      if (var->is_static)
+        print(".global file %s _const_$%s", ty_name, var->name);
+      else
+        print(".global internal %s _const_$%s", ty_name, var->name);
+
       for (int i = 0; i < var->init_data_size; i++)
         print(" 0x%hhx", var->init_data[i]);
-    }
-    
-    println("");
-    
-    if (var->init_expr) {
-      println(".initializer public");
-        make_ptr_offset = 0;
-        avaliable_ptr_offset = false;
 
-        gen_expr(var->init_expr, true);
-        println("  ret");
+      println("");
     }
+
+    if (var->is_static)
+      println(".global file %s* %s", ty_name, var->name);
+    else
+      println(".global public %s* %s", ty_name, var->name);
   }
+
+  println(".initializer file");
+  for (Obj *var = prog; var; var = var->next) {
+    if (var->is_function || !var->is_definition)
+      continue;
+    if (var->is_static)
+      emit_data_alloc(var);
+  }
+  for (Obj *var = prog; var; var = var->next) {
+    if (var->is_function || !var->is_definition)
+      continue;
+    if (var->is_static)
+      emit_data_init(var);
+  }
+  println("  ret");
+
+  println(".initializer internal");
+  for (Obj *var = prog; var; var = var->next) {
+    if (var->is_function || !var->is_definition)
+      continue;
+    if (!var->is_static)
+      emit_data_alloc(var);
+  }
+  for (Obj *var = prog; var; var = var->next) {
+    if (var->is_function || !var->is_definition)
+      continue;
+    if (!var->is_static)
+      emit_data_init(var);
+  }
+  println("  ret");
 }
 
 static void emit_text(Obj *prog) {
