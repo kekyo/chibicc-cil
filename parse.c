@@ -2023,6 +2023,29 @@ static Node *max_node(Node *lhs, Node *rhs)
     return cond;
 }
 
+static Node *reduce_and_cache_size(Node *node) {
+  node = reduce_node(node);
+  switch (node->kind) {
+  case ND_ADD:
+  case ND_SUB:
+  case ND_MUL:
+  case ND_DIV:
+  case ND_LT:
+  case ND_LE:
+  case ND_COND:
+  case ND_COMMA:
+  case ND_STMT_EXPR: {
+    // Cache calculated displacement into anonymous global variable (2)
+    Obj *var = new_anon_gvar(node->ty, "disp");
+    Node *node_var = new_var_node(var, NULL);
+    var->init_expr = new_binary(ND_ASSIGN, node_var, node, NULL);
+    add_type(var->init_expr);
+    return node_var;
+  }
+  }
+  return node;
+}
+
 // struct-decl = struct-union-decl
 static Type *struct_decl(Token **rest, Token *tok) {
   Type *ty = struct_union_decl(rest, tok);
@@ -2042,23 +2065,23 @@ static Type *struct_decl(Token **rest, Token *tok) {
     // mem->origin_offset = align_to(offset, mem->ty->align)
     mem->origin_offset = reduce_node(align_to_node(offset, mem->ty->align));
     // offset = align_to(offset, mem->align)
-    offset = reduce_node(align_to_node(offset, mem->align));
+    offset = reduce_and_cache_size(align_to_node(offset, mem->align));
 
     mem->offset = offset;
 
     // offset = offset + mem->ty->size
-    offset = reduce_node(new_binary(ND_ADD, offset, mem->ty->size, NULL));
+    offset = reduce_and_cache_size(new_binary(ND_ADD, offset, mem->ty->size, NULL));
 
     // origin_align = max(origin_align, mem->ty->align)
     origin_align = reduce_node(max_node(origin_align, mem->ty->align));
     // align = max(align, mem->align)
-    align = reduce_node(max_node(align, mem->align));
+    align = reduce_and_cache_size(max_node(align, mem->align));
   }
 
-  ty->align = reduce_node(align);
+  ty->align = reduce_and_cache_size(align);
 
   // ty->size = align_to(offset, ty->align)
-  ty->size = reduce_node(align_to_node(offset, ty->align));
+  ty->size = reduce_and_cache_size(align_to_node(offset, ty->align));
   // ty->origin_size = align_to(offset, origin_align)
   ty->origin_size = reduce_node(align_to_node(offset, origin_align));
 
@@ -2086,19 +2109,19 @@ static Type *union_decl(Token **rest, Token *tok) {
     mem->origin_offset = node0;
 
     // align = max(align, mem->align)
-    align = reduce_node(max_node(align, mem->align));
+    align = reduce_and_cache_size(max_node(align, mem->align));
     // origin_align = max(origin_align, mem->ty->align)
     origin_align = reduce_node(max_node(origin_align, mem->ty->align));
     // size = max(size, mem->ty->size)
-    size = reduce_node(max_node(size, mem->ty->size));
+    size = reduce_and_cache_size(max_node(size, mem->ty->size));
   }
 
-  ty->align = reduce_node(align);
+  ty->align = reduce_and_cache_size(align);
 
   // ty->origin_size = align_to(size, origin_align)
   ty->origin_size = reduce_node(align_to_node(size, origin_align));
   // ty->size = align_to(size, ty->align)
-  ty->size = reduce_node(align_to_node(size, ty->align));
+  ty->size = reduce_and_cache_size(align_to_node(size, ty->align));
 
   return ty;
 }

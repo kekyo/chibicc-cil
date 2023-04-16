@@ -264,8 +264,21 @@ bool equals_node(Node *lhs, Node *rhs) {
     return true;
   if (lhs == NULL || rhs == NULL)
     return false;
-  if (lhs->kind != rhs->kind)
+
+  if (lhs->kind != rhs->kind) {
+    // For displacement caching (2)
+    if (lhs->kind == ND_VAR &&
+      lhs->var->init_expr &&
+      lhs->var->init_expr->kind == ND_ASSIGN &&
+      lhs->var->init_expr->lhs == lhs)
+      return equals_node(lhs->var->init_expr->rhs, rhs);
+    else if (rhs->kind == ND_VAR &&
+      rhs->var->init_expr &&
+      rhs->var->init_expr->kind == ND_ASSIGN &&
+      rhs->var->init_expr->lhs == rhs)
+      return equals_node(lhs, rhs->var->init_expr->rhs);
     return false;
+  }
 
   switch (lhs->kind) {
     case ND_ADD:
@@ -785,7 +798,9 @@ static Node *cast_type(Node *node, Type *ty) {
     return new_cast(node, ty);
 }
 
-static Node *reduce(Node *node) {
+static Node *reduce(Node *node);
+
+static Node *reduce_(Node *node) {
   if (node->is_reduced)
     return node;
 
@@ -1116,6 +1131,14 @@ static Node *reduce(Node *node) {
   }
 
   unreachable();
+}
+
+static Node *reduce(Node *node) {
+  if (!node->is_reduced) {
+    node = reduce_(node);
+  }
+  node->is_reduced = true;
+  return node;
 }
 
 Node *reduce_node(Node *node) {

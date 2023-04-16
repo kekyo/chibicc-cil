@@ -1044,7 +1044,15 @@ static void assign_lvar_offsets(Obj *prog) {
   }
 }
 
-static void emit_data_alloc(Obj *var) {
+static void emit_data_alloc(Obj *var, bool is_static) {
+  if (var->next)
+    // Will make reversed order.
+    emit_data_alloc(var->next, is_static);
+  if (var->is_function || !var->is_definition)
+    return;
+  if (var->is_static != is_static)
+    return;
+
   println("  ldc.i4.1");
   println("  conv.u");
 
@@ -1058,7 +1066,15 @@ static void emit_data_alloc(Obj *var) {
   println("  stsfld %s", var->name);
 }
 
-static void emit_data_init(Obj *var) {
+static void emit_data_init(Obj *var, bool is_static) {
+  if (var->next)
+    // Will make reversed order.
+    emit_data_init(var->next, is_static);
+  if (var->is_function || !var->is_definition)
+    return;
+  if (var->is_static != is_static)
+    return;
+
   const char *ty_name = to_cil_typename(var->ty);
 
   if (var->init_data) {
@@ -1102,35 +1118,17 @@ static void emit_data(Obj *prog) {
       println(".global public %s* %s", ty_name, var->name);
   }
 
-  println(".initializer file");
-  for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function || !var->is_definition)
-      continue;
-    if (var->is_static)
-      emit_data_alloc(var);
-  }
-  for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function || !var->is_definition)
-      continue;
-    if (var->is_static)
-      emit_data_init(var);
-  }
-  println("  ret");
+  if (prog) {
+    println(".initializer file");
+    emit_data_alloc(prog, true);
+    emit_data_init(prog, true);
+    println("  ret");
 
-  println(".initializer internal");
-  for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function || !var->is_definition)
-      continue;
-    if (!var->is_static)
-      emit_data_alloc(var);
+    println(".initializer internal");
+    emit_data_alloc(prog, false);
+    emit_data_init(prog, false);
+    println("  ret");
   }
-  for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function || !var->is_definition)
-      continue;
-    if (!var->is_static)
-      emit_data_init(var);
-  }
-  println("  ret");
 }
 
 static void emit_text(Obj *prog) {
