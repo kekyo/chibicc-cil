@@ -1,6 +1,7 @@
 .SUFFIXES:
 
-AS=chibias
+#AS=chibias
+AS=../chibias-cil/chibias/bin/Debug/net8.0/chibias
 
 CCFLAGS=-march=any
 #CCFLAGS=-march=m32
@@ -44,7 +45,7 @@ test/%.exe: test/%.c
 $(TESTS1): $(TEST_SRCS) test/test.h test/common.s ./chibicc test/libc-bootstrap.dll
 
 test: $(TESTS1)
-	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
+#	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
 	for i in $^; do echo $$i; mono ./$$i || exit 1; echo; done
 	test/driver.sh ./chibicc
 
@@ -77,17 +78,17 @@ stage2/test/libc-bootstrap.dll: $(LIBC)
 stage2/test/common.s: test/common test/test.h stage2/chibicc.exe 
 	mkdir -p stage2/test
 	$(CC) -o- -E -P -C -xc test/common > stage2/test/common.cp
-	./stage2/chibicc.exe $(CCFLAGS) -o $@ stage2/test/common.cp
+	mono ./stage2/chibicc.exe $(CCFLAGS) -o $@ stage2/test/common.cp
 
 stage2/test/%.exe: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > stage2/test/$*.cp
-	./stage2/chibicc.exe $(CCFLAGS) -o stage2/test/$*.s stage2/test/$*.cp
+	mono ./stage2/chibicc.exe $(CCFLAGS) -o stage2/test/$*.s stage2/test/$*.cp
 	$(AS) $(ASFLAGS) -r stage2/test/libc-bootstrap.dll -o $@ stage2/test/$*.s stage2/test/common.s
 
 $(TESTS2): $(TEST_SRCS) test/test.h stage2/test/common.s stage2/chibicc.exe stage2/test/libc-bootstrap.dll
 
 test-stage2: $(TESTS2)
-	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
+#	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
 	for i in $^; do echo $$i; mono ./$$i || exit 1; echo; done
 	test/driver.sh "mono stage2/chibicc.exe"
 
@@ -102,7 +103,7 @@ stage3/libc-bootstrap.dll: $(LIBC)
 stage3/%.s: ./%.c
 	mkdir -p stage3
 	./self.py chibicc.h $< > stage3/$<
-	./stage2/chibicc.exe $(CCFLAGS) -o $@ stage3/$<
+	mono ./stage2/chibicc.exe $(CCFLAGS) -o $@ stage3/$<
 
 stage3/chibicc.exe: $(OBJS3)
 	$(AS) $(ASFLAGS) -r stage3/libc-bootstrap.dll -o $@ $^
@@ -118,17 +119,17 @@ stage3/test/libc-bootstrap.dll: $(LIBC)
 stage3/test/common.s: test/common test/test.h stage3/chibicc.exe 
 	mkdir -p stage3/test
 	$(CC) -o- -E -P -C -xc test/common > stage3/test/common.cp
-	./stage3/chibicc.exe $(CCFLAGS) -o $@ stage3/test/common.cp
+	mono ./stage3/chibicc.exe $(CCFLAGS) -o $@ stage3/test/common.cp
 
 stage3/test/%.exe: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > stage3/test/$*.cp
-	./stage3/chibicc.exe $(CCFLAGS) -o stage3/test/$*.s stage3/test/$*.cp
+	mono ./stage3/chibicc.exe $(CCFLAGS) -o stage3/test/$*.s stage3/test/$*.cp
 	$(AS) $(ASFLAGS) -r stage3/test/libc-bootstrap.dll -o $@ stage3/test/$*.s stage3/test/common.s
 
 $(TESTS3): $(TEST_SRCS) test/test.h stage3/test/common.s stage3/chibicc.exe stage3/test/libc-bootstrap.dll
 
 test-stage3: $(TESTS3)
-	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
+#	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
 	for i in $^; do echo $$i; mono ./$$i || exit 1; echo; done
 	test/driver.sh "mono stage3/chibicc.exe"
 
