@@ -71,6 +71,15 @@ static void aggregate_type_recursive(Type *ty) {
       }
       break;
     }
+    case TY_FUNC: {
+      if (add_using_type(ty->return_ty))
+        aggregate_type_recursive(ty->return_ty);
+      for (Type *pty = ty->params; pty; pty = pty->next) {
+        if (add_using_type(pty))
+          aggregate_type_recursive(pty);
+      }
+      break;
+    }
   }
 }
 
@@ -99,6 +108,21 @@ static void make_public_type_recursive(Type *ty) {
       }
       break;
     }
+    case TY_FUNC: {
+      // Emit return type recursively.
+      if (!ty->return_ty->is_public) {
+        ty->return_ty->is_public = true;
+        make_public_type_recursive(ty->return_ty);
+      }
+      // Emit parameter type recursively.
+      for (Type *pty = ty->params; pty; pty = pty->next) {
+        if (!pty->is_public) {
+          pty->is_public = true;
+          make_public_type_recursive(pty);
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -107,6 +131,27 @@ static void make_public_type(Type *ty) {
     ty->is_public = true;
     make_public_type_recursive(ty);
   }
+}
+
+static char *get_cil_callsite(Node *n) {
+  if (n->cil_callsite)
+    return n->cil_callsite;
+  char *c = "";
+  Node *pn = n->args;
+  Type *pt = n->func_ty->params;
+  while (pn && pt) {
+    aggregate_type(pn->ty);
+    c = *c == '\0' ? to_cil_typename(pn->ty) : format("%s,%s", c, to_cil_typename(pn->ty));
+    pn = pn->next;
+    pt = pt->next;
+  }
+  // .NET: See **VARARG**
+  if (n->func_ty->is_variadic) {
+    c = *c == '\0' ? "C.type.__va_arglist" : format("%s,C.type.__va_arglist", c);
+  }
+  aggregate_type(n->func_ty->return_ty);
+  n->cil_callsite = format("%s(%s)", to_cil_typename(n->func_ty->return_ty), c);
+  return n->cil_callsite;
 }
 
 // Made native pointer when managed pointer store into it.
@@ -126,6 +171,11 @@ static void gen_addr(Node *node) {
   case ND_VAR:
   case ND_SWITCH:
   case ND_MEMZERO:
+    if (node->var->ty->kind == TY_FUNC) {
+      // Function symbol
+      println("  ldftn %s", node->var->name);
+      return;
+    }
     switch (node->var->kind) {
       case OB_GLOBAL:
         // Global variable
@@ -176,6 +226,8 @@ static void load(Type *ty) {
       // This is where "array is automatically converted to a pointer to
       // the first element of the array in C" occurs.
       gen_make_ptr();
+      return;
+    case TY_FUNC:
       return;
     case TY_STRUCT:
     case TY_UNION:
@@ -358,50 +410,52 @@ static void cast(Type *from, Type *to) {
 }
 
 static void gen_funcall(Node *node, bool will_discard) {
-  // Special case: __builtin_trap()
-  if (strcmp(node->funcname, "__builtin_trap") == 0) {
-    if (node->args)
-      error_tok(node->tok, "invalid argument");
-    else
-      println("  break");
-    return;
-  }
-
-  // Special case: __builtin_va_start(&ap, arg)
-  if (strcmp(node->funcname, "__builtin_va_start") == 0) {
-    if (!node->args || !node->args->next)
-      error_tok(node->tok, "invalid argument");
-    else {
-      gen_expr(node->args, false);
-      println("  ldarg.s %d", node->args->next->var->offset + 1);
-      println("  call __va_start");
+  if (node->lhs->kind == ND_VAR) {
+    // Special case: __builtin_trap()
+    if (strcmp(node->lhs->var->name, "__builtin_trap") == 0) {
+      if (node->args)
+        error_tok(node->tok, "invalid argument");
+      else
+        println("  break");
+      return;
     }
-    return;
-  }
 
-  // Special case: __builtin_va_arg(&ap, (int*)0)
-  if (strcmp(node->funcname, "__builtin_va_arg") == 0) {
-    // &ap
-    Node *arg = node->args;
-    if (!arg)
-      error_tok(node->tok, "invalid argument");
-    gen_expr(arg, false);
-    if (!arg->next)
-      error_tok(arg->tok, "invalid argument");
-    // (int*)0
-    Node *typename_expr = arg->next;
-    if (typename_expr->kind != ND_CAST || typename_expr->ty->kind != TY_PTR)
-      error_tok(arg->tok, "invalid argument");
-    // 0
-    if (typename_expr->ty->base->kind != TY_INT || typename_expr->lhs->kind != ND_NUM || typename_expr->lhs->val != 0)
-      error_tok(arg->tok, "invalid argument");
+    // Special case: __builtin_va_start(&ap, arg)
+    if (strcmp(node->lhs->var->name, "__builtin_va_start") == 0) {
+      if (!node->args || !node->args->next)
+        error_tok(node->tok, "invalid argument");
+      else {
+        gen_expr(node->args, false);
+        println("  ldarg.s %d", node->args->next->var->offset + 1);
+        println("  call __va_start");
+      }
+      return;
+    }
 
-    if (!will_discard)
-      println("  call __va_arg");
+    // Special case: __builtin_va_arg(&ap, (int*)0)
+    if (strcmp(node->lhs->var->name, "__builtin_va_arg") == 0) {
+      // &ap
+      Node *arg = node->args;
+      if (!arg)
+        error_tok(node->tok, "invalid argument");
+      gen_expr(arg, false);
+      if (!arg->next)
+        error_tok(arg->tok, "invalid argument");
+      // (int*)0
+      Node *typename_expr = arg->next;
+      if (typename_expr->kind != ND_CAST || typename_expr->ty->kind != TY_PTR)
+        error_tok(arg->tok, "invalid argument");
+      // 0
+      if (typename_expr->ty->base->kind != TY_INT || typename_expr->lhs->kind != ND_NUM || typename_expr->lhs->val != 0)
+        error_tok(arg->tok, "invalid argument");
 
-    // Avoid casting at parent.
-    node->ty = typename_expr->ty;
-    return;
+      if (!will_discard)
+        println("  call __va_arg");
+
+      // Avoid casting at parent.
+      node->ty = typename_expr->ty;
+      return;
+    }
   }
 
   if (node->func_ty->is_variadic && node->func_ty->params) {  // See **VARARG**
@@ -432,7 +486,8 @@ static void gen_funcall(Node *node, bool will_discard) {
       gen_expr(arg, false);
   }
 
-  println("  call %s", node->funcname);
+  gen_expr(node->lhs, false);
+  println("  calli %s", get_cil_callsite(node));
 
   if (will_discard) {
     if (node->ty->kind != TY_VOID)
@@ -1175,12 +1230,11 @@ static void emit_text(Obj *prog) {
     // https://github.com/dotnet/standard/issues/20
     if (fn->ty->is_variadic)
     {
-      if (!first)
-        print(",");
-      if (fn->ty->params)
+      if (fn->ty->params) {
+        if (!first)
+          print(",");
         print("C.type.__va_arglist");
-      else
-        print("...");
+      }
     }
 
     println(") %s", fn->name);

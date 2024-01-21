@@ -222,9 +222,9 @@ struct Node {
   Member *member;
 
   // Function call
-  char *funcname;
   Type *func_ty;
   Node *args;
+  char *cil_callsite;
 
   // Goto or labeled statement
   char *label;

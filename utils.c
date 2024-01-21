@@ -80,7 +80,20 @@ char *to_cil_typename(Type *ty) {
           name :
           format("_%s_$%d", name, count++);
       } else
-        ty->cil_name =  format("_tag_$%d", count++);
+        ty->cil_name = format("_tag_$%d", count++);
+      return ty->cil_name;
+    }
+    case TY_FUNC: {
+      char *c = "";
+      Type *pty = ty->params;
+      while (pty) {
+        c = *c == '\0' ? to_cil_typename(pty) : format("%s,%s", c, to_cil_typename(pty));
+        pty = pty->next;
+      }
+      // .NET: See **VARARG**
+      ty->cil_name = ty->is_variadic ?
+        format("%s(%s,C.type.__va_arglist)", to_cil_typename(ty->return_ty), c) :
+        format("%s(%s)", to_cil_typename(ty->return_ty), c);
       return ty->cil_name;
     }
   }
@@ -166,9 +179,9 @@ static char *pretty_print(Node *node) {
           arg = arg->next;
           c = format("%s,%s", c, pretty_print(arg));
         }
-        return format("/*(%s)*/(%s(%s))", to_cil_typename(node->ty), node->funcname, c);
+        return format("/*(%s)*/(%s(%s))", to_cil_typename(node->ty), pretty_print(node->lhs), c);
       } else
-        return format("/*(%s)*/(%s())", to_cil_typename(node->ty), node->funcname);
+        return format("/*(%s)*/(%s())", to_cil_typename(node->ty), pretty_print(node->lhs));
     }
     case ND_STMT_EXPR:
       return format("/*(%s)*/(%s)", to_cil_typename(node->ty), pretty_print(node->body));
@@ -578,7 +591,7 @@ static void verify_node0(Node *node) {
       return;
     case ND_FUNCALL: {
       verify_type0(node->ty);
-      verify_c_str(node->funcname);
+      verify_node0(node->lhs);
       Node *arg = node->args;
       while (arg) {
         verify_node0(arg);

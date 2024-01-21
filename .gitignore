@@ -3,6 +3,7 @@
 **/*.o
 **/*.s
 **/*.cp
+**/*.runtimeconfig.json
 **/a.out
 **/mono_crash*
 /tmp*
