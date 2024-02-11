@@ -9,7 +9,7 @@ CCFLAGS=-march=any
 #CCFLAGS=-march=native
 
 CFLAGS=-std=c11 -g -fno-common
-ASFLAGS=-f net6.0 -r $(DOTNET_ROOT)/shared/Microsoft.NETCore.App/6.0.26/System.Private.CoreLib.dll
+ASFLAGS=-f net6.0 -a $(DOTNET_ROOT)/sdk/6.0.418/AppHostTemplate/apphost -r $(DOTNET_ROOT)/shared/Microsoft.NETCore.App/6.0.26/System.Private.CoreLib.dll
 
 LIBC=../libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll
 
@@ -28,116 +28,115 @@ OBJS1=$(SRCS:%.c=%.o)
 
 $(OBJS1): $(SRCS) chibicc.h
 
-TESTS1=$(TEST_SRCS:.c=.exe)
+TESTS1=$(TEST_SRCS:.c=)
 
 test/libc-bootstrap.dll: $(LIBC)
 	cp $(LIBC) -t test
 
-test/common.s: test/common test/test.h ./chibicc
+test/common.o: test/common test/test.h ./chibicc
 	$(CC) -o- -E -P -C -xc test/common > test/common.cp
-	./chibicc $(CCFLAGS) -o $@ test/common.cp
+	./chibicc $(CCFLAGS) -c -o $@ test/common.cp
 
-test/%.exe: test/%.c
+test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > test/$*.cp
-	./chibicc $(CCFLAGS) -o test/$*.s test/$*.cp
-	$(AS) $(ASFLAGS) -r test/libc-bootstrap.dll -o $@ test/$*.s test/common.s
+	./chibicc $(CCFLAGS) -c -o test/$*.o test/$*.cp
+	$(AS) $(ASFLAGS) -r test/libc-bootstrap.dll -o $@ test/$*.o test/common.o
 
-$(TESTS1): $(TEST_SRCS) test/test.h test/common.s ./chibicc test/libc-bootstrap.dll
+$(TESTS1): $(TEST_SRCS) test/test.h test/common.o ./chibicc test/libc-bootstrap.dll
 
 test: $(TESTS1)
-#	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
-	for i in $^; do echo $$i; dotnet ./$$i || exit 1; echo; done
+	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
 	test/driver.sh ./chibicc
 
 test-all: test test-stage2 test-stage3
 
 # Stage 2
 
-OBJS2=$(SRCS:%.c=stage2/%.s)
+OBJS2=$(SRCS:%.c=stage2/%.o)
 
 stage2/libc-bootstrap.dll: $(LIBC)
 	mkdir -p stage2
 	cp $(LIBC) -t stage2
 
-stage2/%.s: ./%.c
+stage2/%.o: ./%.c
 	mkdir -p stage2
 	./self.py chibicc.h $< > stage2/$<
-	./chibicc $(CCFLAGS) -o $@ stage2/$<
+	./chibicc $(CCFLAGS) -c -o $@ stage2/$<
 
-stage2/chibicc.exe: $(OBJS2)
+stage2/chibicc: $(OBJS2)
 	$(AS) $(ASFLAGS) -r stage2/libc-bootstrap.dll -o $@ $^
 
 $(OBJS2): $(SRCS) chibicc.h ./self.py ./chibicc stage2/libc-bootstrap.dll
 
-TESTS2=$(TEST_SRCS:%.c=stage2/%.exe)
+TESTS2=$(TEST_SRCS:%.c=stage2/%)
 
 stage2/test/libc-bootstrap.dll: $(LIBC)
 	mkdir -p stage2/test
 	cp $(LIBC) -t stage2/test
 
-stage2/test/common.s: test/common test/test.h stage2/chibicc.exe 
+stage2/test/common.o: test/common test/test.h stage2/chibicc
 	mkdir -p stage2/test
 	$(CC) -o- -E -P -C -xc test/common > stage2/test/common.cp
-	dotnet ./stage2/chibicc.exe $(CCFLAGS) -o $@ stage2/test/common.cp
+	./stage2/chibicc $(CCFLAGS) -c -o $@ stage2/test/common.cp
 
-stage2/test/%.exe: test/%.c
+stage2/test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > stage2/test/$*.cp
-	dotnet ./stage2/chibicc.exe $(CCFLAGS) -o stage2/test/$*.s stage2/test/$*.cp
-	$(AS) $(ASFLAGS) -r stage2/test/libc-bootstrap.dll -o $@ stage2/test/$*.s stage2/test/common.s
+	./stage2/chibicc $(CCFLAGS) -c -o stage2/test/$*.o stage2/test/$*.cp
+	$(AS) $(ASFLAGS) -r stage2/test/libc-bootstrap.dll -o $@ stage2/test/$*.o stage2/test/common.o
 
-$(TESTS2): $(TEST_SRCS) test/test.h stage2/test/common.s stage2/chibicc.exe stage2/test/libc-bootstrap.dll
+$(TESTS2): $(TEST_SRCS) test/test.h stage2/test/common.o stage2/chibicc stage2/test/libc-bootstrap.dll
 
 test-stage2: $(TESTS2)
-#	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
-	for i in $^; do echo $$i; dotnet ./$$i || exit 1; echo; done
-	test/driver.sh "dotnet stage2/chibicc.exe"
+	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
+	test/driver.sh ./stage2/chibicc
 
 # Stage 3
 
-OBJS3=$(SRCS:%.c=stage3/%.s)
+OBJS3=$(SRCS:%.c=stage3/%.o)
 
 stage3/libc-bootstrap.dll: $(LIBC)
 	mkdir -p stage3
 	cp $(LIBC) -t stage3
 
-stage3/%.s: ./%.c
+stage3/%.o: ./%.c
 	mkdir -p stage3
 	./self.py chibicc.h $< > stage3/$<
-	dotnet ./stage2/chibicc.exe $(CCFLAGS) -o $@ stage3/$<
+	./stage2/chibicc $(CCFLAGS) -c -o $@ stage3/$<
 
-stage3/chibicc.exe: $(OBJS3)
+stage3/chibicc: $(OBJS3)
 	$(AS) $(ASFLAGS) -r stage3/libc-bootstrap.dll -o $@ $^
 
-$(OBJS3): $(SRCS) chibicc.h ./self.py ./stage2/chibicc.exe stage3/libc-bootstrap.dll
+$(OBJS3): $(SRCS) chibicc.h ./self.py ./stage2/chibicc stage3/libc-bootstrap.dll
 
-TESTS3=$(TEST_SRCS:%.c=stage3/%.exe)
+TESTS3=$(TEST_SRCS:%.c=stage3/%)
 
 stage3/test/libc-bootstrap.dll: $(LIBC)
 	mkdir -p stage3/test
 	cp $(LIBC) -t stage3/test
 
-stage3/test/common.s: test/common test/test.h stage3/chibicc.exe 
+stage3/test/common.o: test/common test/test.h stage3/chibicc
 	mkdir -p stage3/test
 	$(CC) -o- -E -P -C -xc test/common > stage3/test/common.cp
-	dotnet ./stage3/chibicc.exe $(CCFLAGS) -o $@ stage3/test/common.cp
+	./stage3/chibicc $(CCFLAGS) -c -o $@ stage3/test/common.cp
 
-stage3/test/%.exe: test/%.c
+stage3/test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > stage3/test/$*.cp
-	dotnet ./stage3/chibicc.exe $(CCFLAGS) -o stage3/test/$*.s stage3/test/$*.cp
-	$(AS) $(ASFLAGS) -r stage3/test/libc-bootstrap.dll -o $@ stage3/test/$*.s stage3/test/common.s
+	./stage3/chibicc $(CCFLAGS) -c -o stage3/test/$*.o stage3/test/$*.cp
+	$(AS) $(ASFLAGS) -r stage3/test/libc-bootstrap.dll -o $@ stage3/test/$*.o stage3/test/common.o
 
-$(TESTS3): $(TEST_SRCS) test/test.h stage3/test/common.s stage3/chibicc.exe stage3/test/libc-bootstrap.dll
+$(TESTS3): $(TEST_SRCS) test/test.h stage3/test/common.o stage3/chibicc stage3/test/libc-bootstrap.dll
 
 test-stage3: $(TESTS3)
-#	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
-	for i in $^; do echo $$i; dotnet ./$$i || exit 1; echo; done
-	test/driver.sh "dotnet stage3/chibicc.exe"
+	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
+	test/driver.sh ./stage3/chibicc
 
 # Misc.
 
 clean:
 	rm -rf chibicc tmp*
-	rm -rf test/*.cp test/*.s test/*.exe test/libc-bootstrap.dll test/*.exestage?
+	rm -rf test/*.cp test/*.o test/*.exe test/*.dll test/*.exestage?
+	rm -rf $(TESTS1) $(TESTS2) $(TESTS3)
+	rm -rf stage2 stage3
 	find * -type f '(' -name '*~' -o -name '*.o' -o -name '*.runtimeconfig.json' ')' -exec rm {} ';'
 
 .PHONY: test test-stage2 test-stage3 clean

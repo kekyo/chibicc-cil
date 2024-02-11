@@ -69,15 +69,20 @@ double strtod(char *nptr, char **endptr);
 static void va_end(va_list ap) {}
 unsigned long strtoul(char *nptr, char **endptr, int base);
 void exit(int code);
-int system(char *command);
+char *basename(char *path);
+char *strrchr(char *s, int c);
+int unlink(char *pathname);
+int mkstemp(char *template);
+int close(int fd);
 typedef int pid_t;
-int posix_spawn(pid_t *pid,
+int posix_spawnp(pid_t *pid,
   const char *path,
   const void *file_actions,
   const void *attrp,
   char *const argv[],
   char *const envp[]);
 pid_t waitpid(pid_t pid, int *stat_loc, int options);
+int atexit(void (*)(void));
 static int WIFEXITED(int status) { return status & 0x80; }
 static int WIFSIGNALED(int status)	{ return 0; }
 """)
