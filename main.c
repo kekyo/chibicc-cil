@@ -195,6 +195,7 @@ static void cc1(void) {
 
   // Tokenize and parse.
   Token *tok = tokenize_file(base_file);
+  tok = preprocess(tok);
   Obj *prog = parse(tok);
 
   // Traverse the AST to emit assembly.
