@@ -9,7 +9,7 @@ CCFLAGS=-march=any
 #CCFLAGS=-march=native
 
 CFLAGS=-std=c11 -g -fno-common
-ASFLAGS=-f net6.0 -a $(DOTNET_ROOT)/sdk/6.0.418/AppHostTemplate/apphost -r $(DOTNET_ROOT)/shared/Microsoft.NETCore.App/6.0.26/System.Private.CoreLib.dll
+#ASFLAGS=-f net6.0 -a $(DOTNET_ROOT)/sdk/6.0.418/AppHostTemplate/apphost -L$(DOTNET_ROOT)/shared/Microsoft.NETCore.App/6.0.26 -lSystem.Private.CoreLib
 
 LIBC=../libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll
 
@@ -40,7 +40,7 @@ test/common.o: test/common test/test.h ./chibicc
 test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > test/$*.cp
 	./chibicc $(CCFLAGS) -c -o test/$*.o test/$*.cp
-	$(AS) $(ASFLAGS) -r test/libc-bootstrap.dll -o $@ test/$*.o test/common.o
+	./chibicc $(CCFLAGS) -o $@ test/$*.o test/common.o
 
 $(TESTS1): $(TEST_SRCS) test/test.h test/common.o ./chibicc test/libc-bootstrap.dll
 
@@ -64,7 +64,7 @@ stage2/%.o: ./%.c
 	./chibicc $(CCFLAGS) -c -o $@ stage2/$<
 
 stage2/chibicc: $(OBJS2)
-	$(AS) $(ASFLAGS) -r stage2/libc-bootstrap.dll -o $@ $^
+	./chibicc $(CCFLAGS) -o $@ $^
 
 $(OBJS2): $(SRCS) chibicc.h ./self.py ./chibicc stage2/libc-bootstrap.dll
 
@@ -82,7 +82,7 @@ stage2/test/common.o: test/common test/test.h stage2/chibicc
 stage2/test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > stage2/test/$*.cp
 	./stage2/chibicc $(CCFLAGS) -c -o stage2/test/$*.o stage2/test/$*.cp
-	$(AS) $(ASFLAGS) -r stage2/test/libc-bootstrap.dll -o $@ stage2/test/$*.o stage2/test/common.o
+	./stage2/chibicc $(CCFLAGS) -o $@ stage2/test/$*.o stage2/test/common.o
 
 $(TESTS2): $(TEST_SRCS) test/test.h stage2/test/common.o stage2/chibicc stage2/test/libc-bootstrap.dll
 
@@ -104,7 +104,7 @@ stage3/%.o: ./%.c
 	./stage2/chibicc $(CCFLAGS) -c -o $@ stage3/$<
 
 stage3/chibicc: $(OBJS3)
-	$(AS) $(ASFLAGS) -r stage3/libc-bootstrap.dll -o $@ $^
+	./stage2/chibicc $(CCFLAGS) -o $@ $^
 
 $(OBJS3): $(SRCS) chibicc.h ./self.py ./stage2/chibicc stage3/libc-bootstrap.dll
 
@@ -122,7 +122,7 @@ stage3/test/common.o: test/common test/test.h stage3/chibicc
 stage3/test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > stage3/test/$*.cp
 	./stage3/chibicc $(CCFLAGS) -c -o stage3/test/$*.o stage3/test/$*.cp
-	$(AS) $(ASFLAGS) -r stage3/test/libc-bootstrap.dll -o $@ stage3/test/$*.o stage3/test/common.o
+	./stage3/chibicc $(CCFLAGS) -o $@ stage3/test/$*.o stage3/test/common.o
 
 $(TESTS3): $(TEST_SRCS) test/test.h stage3/test/common.o stage3/chibicc stage3/test/libc-bootstrap.dll
 

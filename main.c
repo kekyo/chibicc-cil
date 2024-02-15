@@ -116,6 +116,12 @@ static FILE *open_file(char *path) {
   return out;
 }
 
+static bool endswith(char *p, char *q) {
+  int len1 = strlen(p);
+  int len2 = strlen(q);
+  return (len1 >= len2) && !strcmp(p + len1 - len2, q);
+}
+
 // Replace file extension
 static char *replace_extn(char *tmpl, char *extn) {
   char *filename = basename(strdup(tmpl));
@@ -200,13 +206,72 @@ static void cc1(void) {
 
 static void assemble(char *input, char *output) {
   char *cmd[] = {
-    "chibias",
-    //"/home/kouji/Projects/chibias-cil/chibias/bin/Debug/net8.0/chibias",
-    "-f", "net6.0",
-    "-r", "/home/kouji/.dotnet/shared/Microsoft.NETCore.App/6.0.26/System.Private.CoreLib.dll",
-    "-r", "/home/kouji/Projects/libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll",
-    "-c", input, "-o", output, NULL};
+    "cp", input, output, NULL };
   run_subprocess(cmd);
+}
+
+static char *find_file(char *pattern) {
+  char *path = NULL;
+  glob_t buf = {};
+  glob(pattern, 0, NULL, &buf);
+  if (buf.gl_pathc > 0)
+    path = strdup(buf.gl_pathv[buf.gl_pathc - 1]);
+  globfree(&buf);
+  return path;
+}
+
+// Returns true if a given file exists.
+static bool file_exists(char *path) {
+  struct stat st;
+  return !stat(path, &st);
+}
+
+static char *find_libpath(void) {
+  if (file_exists("/home/kouji/.dotnet/shared/Microsoft.NETCore.App/6.0.26/System.Private.CoreLib.dll"))
+    return "/home/kouji/.dotnet/shared/Microsoft.NETCore.App/6.0.26";
+  error("library path is not found");
+}
+
+static char *find_gcc_libpath(void) {
+  char *paths[] = {
+    "/home/kouji/Projects/libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll",
+  };
+
+  for (int i = 0; i < sizeof(paths) / sizeof(*paths); i++) {
+    char *path = find_file(paths[i]);
+    if (path)
+      return dirname(path);
+  }
+
+  error("gcc library path is not found");
+}
+
+static void run_linker(StringArray *inputs, char *output) {
+  StringArray arr = {};
+
+  //strarray_push(&arr, "/home/kouji/Projects/chibias-cil/chibias/bin/Debug/net8.0/chibias");
+  strarray_push(&arr, "chibias");
+  strarray_push(&arr, "-o");
+  strarray_push(&arr, output);
+  strarray_push(&arr, "-f");
+  strarray_push(&arr, "net6.0");
+  strarray_push(&arr, "-a");
+  strarray_push(&arr, "/home/kouji/.dotnet/sdk/6.0.418/AppHostTemplate/apphost");
+
+  char *libpath = find_libpath();
+  char *gcc_libpath = find_gcc_libpath();
+
+  strarray_push(&arr, format("-L%s", gcc_libpath));
+  strarray_push(&arr, format("-L%s", libpath));
+
+  for (int i = 0; i < inputs->len; i++)
+    strarray_push(&arr, inputs->data[i]);
+
+  strarray_push(&arr, "-lc-bootstrap");
+  strarray_push(&arr, "-lSystem.Private.CoreLib");
+  strarray_push(&arr, NULL);
+
+  run_subprocess(arr.data);
 }
 
 int main(int argc, char **argv) {
@@ -218,8 +283,10 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  if (input_paths.len > 1 && opt_o)
-    error("cannot specify '-o' with multiple files");
+  if (input_paths.len > 1 && opt_o && (opt_c || opt_S))
+    error("cannot specify '-o' with '-c' or '-S' with multiple files");
+
+  StringArray ld_args = {};
 
   for (int i = 0; i < input_paths.len; i++) {
     char *input = input_paths.data[i];
@@ -232,18 +299,41 @@ int main(int argc, char **argv) {
     else
       output = replace_extn(input, ".o");
 
-    // If -S is given, assembly text is the final output.
+    // Handle .o
+    if (endswith(input, ".o")) {
+      strarray_push(&ld_args, input);
+      continue;
+    }
+
+    // Handle .s
+    if (endswith(input, ".s")) {
+      if (!opt_S)
+        assemble(input, output);
+      continue;
+    }
+
+    // Handle .c
+    // TODO: Remove .cp
+    if (!endswith(input, ".c") && !endswith(input, ".cp") && strcmp(input, "-"))
+      error("unknown file extension: %s", input);
+
+    // Just compile
     // .NET: chibias always consumes only assembler source code (into .o file.)
     if (opt_S || opt_c) {
       run_cc1(argc, argv, input, output);
       continue;
     }
 
-    // Otherwise, run the assembler to assemble our output.
-    char *tmpfile = create_tmpfile();
-    run_cc1(argc, argv, input, tmpfile);
-    assemble(tmpfile, output);
+    // Compile, assemble and link
+    char *tmp1 = create_tmpfile();
+    char *tmp2 = create_tmpfile();
+    run_cc1(argc, argv, input, tmp1);
+    assemble(tmp1, tmp2);
+    strarray_push(&ld_args, tmp2);
+    continue;
   }
 
+  if (ld_args.len > 0)
+    run_linker(&ld_args, opt_o ? opt_o : "a.out.exe");
   return 0;
 }

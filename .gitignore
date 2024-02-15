@@ -10,6 +10,7 @@
 /chibicc
 /test/*.exe
 /test/*.dll
+/test/[a-z][a-z]*
 /stage?
 **/.vs/*
 **/.vscode/*

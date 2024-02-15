@@ -31,6 +31,13 @@ struct stat {
   char _[512];
 };
 
+typedef struct {
+  size_t gl_pathc;
+  char **gl_pathv;
+  size_t gl_offs;
+  char _[512];
+} glob_t;
+
 void *malloc(size_t size);
 void *calloc(size_t nmemb, size_t size);
 void *realloc(void *buf, size_t size);
@@ -46,6 +53,10 @@ int fclose(FILE *fp);
 int fputc(int c, FILE *fp);
 int feof(FILE *fp);
 static void assert() {}
+int glob(char *pattern, int flags, void *errfn, glob_t *pglob);
+void globfree(glob_t *pglob);
+int stat(char *pathname, struct stat *statbuf);
+char *dirname(char *path);
 int strcmp(char *s1, char *s2);
 int strncasecmp(char *s1, char *s2, size_t n);
 int memcmp(void *s1, void *s2, size_t n);
