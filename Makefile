@@ -37,6 +37,10 @@ test/common.o: test/common test/test.h ./chibicc
 	$(CC) -o- -E -P -C -xc test/common > test/common.cp
 	./chibicc $(CCFLAGS) -c -o $@ test/common.cp
 
+test/macro: chibicc test/macro.c test/common.o
+	./chibicc $(CCFLAGS) -c -o test/macro.o test/macro.c
+	./chibicc $(CCFLAGS) -o $@ test/macro.o test/common.o
+
 test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > test/$*.cp
 	./chibicc $(CCFLAGS) -c -o test/$*.o test/$*.cp
@@ -78,6 +82,11 @@ stage2/test/common.o: test/common test/test.h stage2/chibicc
 	mkdir -p stage2/test
 	$(CC) -o- -E -P -C -xc test/common > stage2/test/common.cp
 	./stage2/chibicc $(CCFLAGS) -c -o $@ stage2/test/common.cp
+
+stage2/test/macro: stage2/chibicc test/macro.c
+	mkdir -p stage2/test
+	./stage2/chibicc $(CCFLAGS) -c -o stage2/test/macro.o test/macro.c
+	./stage2/chibicc $(CCFLAGS) -o $@ stage2/test/macro.o stage2/test/common.o
 
 stage2/test/%: test/%.c
 	$(CC) -o- -E -P -C test/$*.c > stage2/test/$*.cp
