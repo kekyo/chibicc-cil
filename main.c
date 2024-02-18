@@ -7,7 +7,7 @@ static bool opt_cc1;
 static bool opt_hash_hash_hash;
 static char *opt_o;
 
-static char *base_file;
+char *base_file;
 static char *output_file;
 
 static StringArray input_paths;
@@ -195,12 +195,14 @@ static void cc1(void) {
 
   // Tokenize and parse.
   Token *tok = tokenize_file(base_file);
+  if (!tok)
+    error("%s: %s", base_file, strerror(errno));
+
   tok = preprocess(tok);
   Obj *prog = parse(tok);
 
   // Traverse the AST to emit assembly.
   FILE *out = open_file(output_file);
-  fprintf(out, ".file 1 \"%s\" c\n", base_file);
   codegen(prog, out);
   fflush(out);
 }
@@ -338,8 +340,7 @@ int main(int argc, char **argv) {
     }
 
     // Handle .c
-    // TODO: Remove .cp
-    if (!endswith(input, ".c") && !endswith(input, ".cp") && strcmp(input, "-"))
+    if (!endswith(input, ".c") && strcmp(input, "-"))
       error("unknown file extension: %s", input);
 
     // Just compile

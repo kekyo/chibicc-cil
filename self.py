@@ -97,6 +97,7 @@ int atexit(void (*)(void));
 char *getenv(const char *name);
 static int WIFEXITED(int status) { return status & 0x80; }
 static int WIFSIGNALED(int status)	{ return 0; }
+FILE *open_memstream(char **ptr, size_t *sizeloc);
 """)
 
 for path in sys.argv[1:]:

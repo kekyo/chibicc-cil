@@ -559,7 +559,8 @@ static void gen_sizeof(Type *ty) {
 // If will_discard is true, the result must be discarded.
 static void gen_expr(Node *node, bool will_discard) {
   if (node->tok)
-    println("  .location 1 %d %d %d %d",
+    println("  .location %d %d %d %d %d",
+      node->tok->file->file_no,
       node->tok->line_no - 1,
       node->tok->column_no - 1,
       node->tok->line_no - 1,
@@ -854,7 +855,8 @@ static void gen_dummy_value(Type *ty) {
 // When true is returned, the execution flow continues.
 static bool gen_stmt(Node *node) {
   if (node->tok)
-    println("  .location 1 %d %d %d %d",
+    println("  .location %d %d %d %d %d",
+      node->tok->file->file_no,
       node->tok->line_no - 1,
       node->tok->column_no - 1,
       node->tok->line_no - 1,
@@ -1267,7 +1269,11 @@ static void emit_text(Obj *prog) {
 
 void codegen(Obj *prog, FILE *out) {
   output_file = out;
-  
+
+  File **files = get_input_files();
+  for (int i = 0; files[i]; i++)
+    println(".file %d \"%s\" c\n", files[i]->file_no, files[i]->name);
+
   assign_lvar_offsets(prog);
   aggregate_types(prog);
   emit_data(prog);
