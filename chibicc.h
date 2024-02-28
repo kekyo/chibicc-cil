@@ -282,6 +282,7 @@ Node *new_flonum(double fval, Type *ty, Token *tok);
 Node *new_typed_num(int64_t val, Type *ty, Token *tok);
 Node *new_sizeof(Type *ty, Token *tok);
 Node *new_cast(Node *expr, Type *ty);
+int64_t const_expr(Token **rest, Token *tok);
 Obj *parse(Token *tok);
 
 //

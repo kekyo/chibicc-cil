@@ -96,7 +96,6 @@ static Node *expr(Token **rest, Token *tok);
 static int64_t eval(Node *node);
 static Node *assign(Token **rest, Token *tok);
 static Node *logor(Token **rest, Token *tok);
-static int64_t const_expr(Token **rest, Token *tok);
 static double eval_double(Node *node);
 static Node *conditional(Token **rest, Token *tok);
 static Node *logand(Token **rest, Token *tok);
@@ -1515,7 +1514,7 @@ static int64_t eval(Node *node) {
   error_tok(node->tok, "not a compile-time constant");
 }
 
-static int64_t const_expr(Token **rest, Token *tok) {
+int64_t const_expr(Token **rest, Token *tok) {
   Node *node = conditional(rest, tok);
   return eval(node);
 }
