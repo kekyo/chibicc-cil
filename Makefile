@@ -1,7 +1,7 @@
 .SUFFIXES:
 
 AS=chibias
-#AS=../chibias-cil/chibias/bin/Debug/net8.0/chibias
+#AS=../chibias-cil/chibias/bin/Debug/net6.0/chibias
 
 CFLAGS=-std=c11 -g -fno-common
 

@@ -301,7 +301,7 @@ static void run_linker(StringArray *inputs, char *output) {
 
   char *apphostpath = find_apphostpath();
 
-  //strarray_push(&arr, "/home/kouji/Projects/chibias-cil/chibias/bin/Debug/net8.0/chibias");
+  //strarray_push(&arr, "/home/kouji/Projects/chibias-cil/chibias/bin/Debug/net6.0/chibias");
   strarray_push(&arr, "chibias");
   strarray_push(&arr, "-o");
   strarray_push(&arr, output);
