@@ -94,6 +94,7 @@ int posix_spawnp(pid_t *pid,
   char *const envp[]);
 pid_t waitpid(pid_t pid, int *stat_loc, int options);
 int atexit(void (*)(void));
+char *getenv(const char *name);
 static int WIFEXITED(int status) { return status & 0x80; }
 static int WIFSIGNALED(int status)	{ return 0; }
 """)

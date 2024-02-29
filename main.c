@@ -226,28 +226,49 @@ static bool file_exists(char *path) {
   return !stat(path, &st);
 }
 
+static char *get_dotnet_root(void) {
+  static char *dnp = NULL;
+  if (dnp == NULL) {
+    dnp = getenv("DOTNET_ROOT");
+    if (dnp == NULL)
+      dnp = format("%s/.dotnet", getenv("HOME"));
+  }
+  return dnp;
+}
+
 static char *find_libpath(void) {
-  if (file_exists("/home/kouji/.dotnet/shared/Microsoft.NETCore.App/6.0.26/System.Private.CoreLib.dll"))
-    return "/home/kouji/.dotnet/shared/Microsoft.NETCore.App/6.0.26";
+  char *rcpath = format("%s/shared/Microsoft.NETCore.App/6.0.*/System.Private.CoreLib.dll", get_dotnet_root());
+  char *libpath = find_file(rcpath);
+  if (libpath)
+    return strdup(dirname(libpath));
   error("library path is not found");
 }
 
 static char *find_gcc_libpath(void) {
+  char *libcpath = format("%s/Projects/libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll", getenv("HOME"));
   char *paths[] = {
-    "/home/kouji/Projects/libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll",
+    libcpath
   };
 
   for (int i = 0; i < sizeof(paths) / sizeof(*paths); i++) {
     char *path = find_file(paths[i]);
     if (path)
-      return dirname(path);
+      return strdup(dirname(path));
   }
 
   error("gcc library path is not found");
 }
 
+static char *find_apphostpath(void) {
+  char *rcpath = format("%s/sdk/6.0.*/AppHostTemplate/apphost", get_dotnet_root());
+  char *apphostpath = find_file(rcpath);
+  return apphostpath;
+}
+
 static void run_linker(StringArray *inputs, char *output) {
   StringArray arr = {};
+
+  char *apphostpath = find_apphostpath();
 
   //strarray_push(&arr, "/home/kouji/Projects/chibias-cil/chibias/bin/Debug/net8.0/chibias");
   strarray_push(&arr, "chibias");
@@ -255,8 +276,11 @@ static void run_linker(StringArray *inputs, char *output) {
   strarray_push(&arr, output);
   strarray_push(&arr, "-f");
   strarray_push(&arr, "net6.0");
-  strarray_push(&arr, "-a");
-  strarray_push(&arr, "/home/kouji/.dotnet/sdk/6.0.418/AppHostTemplate/apphost");
+
+  if (apphostpath) {
+    strarray_push(&arr, "-a");
+    strarray_push(&arr, apphostpath);
+  }
 
   char *libpath = find_libpath();
   char *gcc_libpath = find_gcc_libpath();
