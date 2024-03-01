@@ -443,4 +443,6 @@ void codegen(Obj *prog, FILE *out);
 // main.c
 //
 
+bool file_exists(char *path);
+
 extern char *base_file;

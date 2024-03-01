@@ -55,7 +55,6 @@ int feof(FILE *fp);
 static void assert() {}
 int glob(char *pattern, int flags, void *errfn, glob_t *pglob);
 void globfree(glob_t *pglob);
-int stat(char *pathname, struct stat *statbuf);
 char *dirname(char *path);
 int strcmp(char *s1, char *s2);
 int strncasecmp(char *s1, char *s2, size_t n);
@@ -99,6 +98,7 @@ static int WIFEXITED(int status) { return status & 0x80; }
 static int WIFSIGNALED(int status)	{ return 0; }
 FILE *open_memstream(char **ptr, size_t *sizeloc);
 char *strncpy(char *dest, char *src, size_t n);
+int stat(char *pathname, struct stat *statbuf);
 """)
 
 for path in sys.argv[1:]:
