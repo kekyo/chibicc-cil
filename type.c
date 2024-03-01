@@ -1,6 +1,6 @@
 #include "chibicc.h"
 
-static MemoryModel mem_model;
+MemoryModel mem_model;
 
 static Node *size0_node = &(Node){ND_NUM, 0};
 static Node *size1_node = &(Node){ND_NUM, 1};

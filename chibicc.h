@@ -406,6 +406,8 @@ typedef enum MemoryModel {
   M64,
 } MemoryModel;
 
+extern MemoryModel mem_model;
+
 void init_type_system(MemoryModel mm);
 
 bool is_integer(Type *ty);
