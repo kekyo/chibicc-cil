@@ -266,6 +266,7 @@ bool equals_type(Type *lhs, Type *rhs) {
     case TY_ENUM:
     case TY_STRUCT:
     case TY_UNION:
+    case TY_FUNC:
       return false;
     default:
       unreachable();

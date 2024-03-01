@@ -1014,6 +1014,19 @@ static void aggregate_types(Obj *prog) {
   }
 }
 
+static char *safe_to_cil_typename(Type *ty) {
+  switch (ty->kind) {
+    case TY_PTR:
+      return format("%s*", safe_to_cil_typename(ty->base));
+    // HACK: The function pointer type will response invalid size on CLR.
+    // So, this makes `void*`.
+    case TY_FUNC:
+      return "void";
+    default:
+      return to_cil_typename(ty);
+  }
+}
+
 static void emit_type(Obj *prog) {
   while (using_type) {
     Type *ty = using_type->ty;
@@ -1033,7 +1046,7 @@ static void emit_type(Obj *prog) {
         for (Member *mem = ty->members; mem; mem = mem->next) {
           // Exactly equals both offsets.
           if (equals_node(mem->offset, mem->origin_offset))
-            println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
+            println("  public %s %s", safe_to_cil_typename(mem->ty), get_string(mem->name));
           // Couldn't adjust with padding when offset/size is not concrete.
           // (Because mem->offset and ty->size are reduced.)
           else if (mem->offset->kind != ND_NUM || last_size->kind != ND_NUM)
@@ -1044,7 +1057,7 @@ static void emit_type(Obj *prog) {
             int64_t pad_size = mem->offset->val - pad_start;
             if (pad_size >= 1)
               println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
-            println("  public %s %s", to_cil_typename(mem->ty), get_string(mem->name));
+            println("  public %s %s", safe_to_cil_typename(mem->ty), get_string(mem->name));
           } else
             unreachable();
           last_offset = mem->offset;
@@ -1067,7 +1080,7 @@ static void emit_type(Obj *prog) {
       case TY_UNION:
         println(".structure %s %s explicit", ty_scope, to_cil_typename(ty));
         for (Member *mem = ty->members; mem; mem = mem->next)
-          println("  public %s %s 0", to_cil_typename(mem->ty), get_string(mem->name));
+          println("  public %s %s 0", safe_to_cil_typename(mem->ty), get_string(mem->name));
         // Not equals both sizes.
         if (!equals_node(ty->size, ty->origin_size)) {
           if (ty->size->kind != ND_NUM)
