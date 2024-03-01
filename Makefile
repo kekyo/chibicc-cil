@@ -30,12 +30,8 @@ test/libc-bootstrap.dll: $(LIBC)
 test/common.o: test/common test/test.h ./chibicc
 	$(CC) -o- -E -P -C -xc test/common | ./chibicc -c -o $@ -
 
-test/macro: chibicc test/macro.c test/common.o test/libc-bootstrap.dll
-	./chibicc -c -o test/macro.o test/macro.c
-	./chibicc -o $@ test/macro.o test/common.o
-
 test/%: test/%.c chibicc test/common.o test/libc-bootstrap.dll
-	$(CC) -o- -E -P -C test/$*.c | ./chibicc -c -o test/$*.o -
+	./chibicc -c -o test/$*.o test/$*.c
 	./chibicc -o $@ test/$*.o test/common.o
 
 $(TESTS1): $(TEST_SRCS) test/test.h test/common.o ./chibicc test/libc-bootstrap.dll
@@ -74,13 +70,8 @@ stage2/test/common.o: test/common test/test.h stage2/chibicc
 	mkdir -p stage2/test
 	$(CC) -o- -E -P -C -xc test/common | ./stage2/chibicc -c -o $@ -
 
-stage2/test/macro: stage2/chibicc test/macro.c
-	mkdir -p stage2/test
-	./stage2/chibicc -c -o stage2/test/macro.o test/macro.c
-	./stage2/chibicc -o $@ stage2/test/macro.o stage2/test/common.o
-
 stage2/test/%: test/%.c
-	$(CC) -o- -E -P -C test/$*.c | ./stage2/chibicc -c -o stage2/test/$*.o -
+	./stage2/chibicc -c -o stage2/test/$*.o test/$*.c
 	./stage2/chibicc -o $@ stage2/test/$*.o stage2/test/common.o
 
 $(TESTS2): $(TEST_SRCS) test/test.h stage2/test/common.o stage2/chibicc stage2/test/libc-bootstrap.dll
@@ -118,7 +109,7 @@ stage3/test/common.o: test/common test/test.h stage3/chibicc
 	$(CC) -o- -E -P -C -xc test/common | ./stage3/chibicc -c -o $@ -
 
 stage3/test/%: test/%.c
-	$(CC) -o- -E -P -C test/$*.c | ./stage3/chibicc -c -o stage3/test/$*.o -
+	./stage3/chibicc -c -o stage3/test/$*.o test/$*.c
 	./stage3/chibicc -o $@ stage3/test/$*.o stage3/test/common.o
 
 $(TESTS3): $(TEST_SRCS) test/test.h stage3/test/common.o stage3/chibicc stage3/test/libc-bootstrap.dll
