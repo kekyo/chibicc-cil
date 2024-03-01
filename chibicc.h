@@ -445,4 +445,5 @@ void codegen(Obj *prog, FILE *out);
 
 bool file_exists(char *path);
 
+extern StringArray include_paths;
 extern char *base_file;
