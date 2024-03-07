@@ -435,6 +435,7 @@ void verify_node(Node *node);
 bool equals_type(Type *lhs, Type *rhs);
 bool equals_node(Node *lhs, Node *rhs);
 Node *reduce_node(Node *node);
+int64_t get_by_integer(Node *node);
 
 //
 // codegen.c

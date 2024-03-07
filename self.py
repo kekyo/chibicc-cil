@@ -99,6 +99,7 @@ static int WIFSIGNALED(int status)	{ return 0; }
 FILE *open_memstream(char **ptr, size_t *sizeloc);
 char *strncpy(char *dest, char *src, size_t n);
 int stat(char *pathname, struct stat *statbuf);
+char *strncat(char *s1, char *s2, size_t n);
 """)
 
 for path in sys.argv[1:]:

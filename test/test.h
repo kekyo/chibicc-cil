@@ -18,6 +18,7 @@ void assert(long expected, long actual, char *code);
 int printf(char *fmt, ...);
 int sprintf(char *buf, char *fmt, ...);
 int strcmp(char *p, char *q);
+int strncmp(char *p, char *q, size_t n);
 int memcmp(char *p, char *q, size_t n);
 void exit(int code);
 int getptrsize();

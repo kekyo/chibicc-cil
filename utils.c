@@ -736,7 +736,7 @@ static bool is_immutable(Node *node) {
   }
 }
 
-static int64_t get_by_integer(Node *node) {
+int64_t get_by_integer(Node *node) {
   switch (node->ty->kind) {
   case TY_BOOL:
     return node->val ? 1 : 0;
