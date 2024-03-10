@@ -486,8 +486,13 @@ static void gen_funcall(Node *node, bool will_discard) {
       gen_expr(arg, false);
   }
 
-  gen_expr(node->lhs, false);
-  println("  calli %s", get_cil_callsite(node));
+  // Direct call
+  if (node->lhs->kind == ND_VAR && node->lhs->var->ty->kind == TY_FUNC) {
+    println("  call %s", node->lhs->var->name);
+  } else {
+    gen_expr(node->lhs, false);
+    println("  calli %s", get_cil_callsite(node));
+  }
 
   if (will_discard) {
     if (node->ty->kind != TY_VOID)
