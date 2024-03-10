@@ -2306,13 +2306,13 @@ static Node *primary(Token **rest, Token *tok) {
   if (equal(tok, "sizeof") && equal(tok->next, "(") && is_typename(tok->next->next)) {
     Type *ty = typename(&tok, tok->next->next);
     *rest = skip(tok, ")");
-    return new_sizeof(ty, start);
+    return reduce_node(new_sizeof(ty, start));
   }
 
   if (equal(tok, "sizeof")) {
     Node *node = unary(rest, tok->next);
     add_type(node);
-    return node->ty->size;
+    return reduce_node(new_sizeof(node->ty, start));
   }
 
   if (equal(tok, "_Alignof") && equal(tok->next, "(") && is_typename(tok->next->next)) {

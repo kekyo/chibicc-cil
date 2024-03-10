@@ -5,12 +5,18 @@ static int calculate_size(Type *ty) {
     return ty->size->val;
   switch (ty->kind) {
     case TY_ARRAY: {
+      if (!ty->array_len)
+        return 0;
       int sz = calculate_size(ty->base);
-      if (sz >= 0) {
+      if (sz >= 0)
         return sz * ty->array_len;
-      }
       break;
     }
+    case TY_STRUCT:
+    case TY_UNION:
+      if (!ty->members)
+        return 0;
+      break;
   }
   return -1;
 }
@@ -266,7 +272,19 @@ bool equals_type(Type *lhs, Type *rhs) {
     case TY_ENUM:
     case TY_STRUCT:
     case TY_UNION:
+      return false;
     case TY_FUNC:
+      if (equals_type(lhs->return_ty, rhs->return_ty)) {
+        Type *lt = lhs->params;
+        Type *rt = lhs->params;
+        while (lt != NULL && rt != NULL) {
+          if (!equals_type(lt, rt))
+            return false;
+          lt = lt->next;
+          rt = rt->next;
+        }
+        return lt == NULL && rt == NULL;
+      }
       return false;
     default:
       unreachable();
