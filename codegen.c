@@ -446,7 +446,7 @@ static void gen_funcall(Node *node, bool will_discard) {
       if (typename_expr->kind != ND_CAST || typename_expr->ty->kind != TY_PTR)
         error_tok(arg->tok, "invalid argument");
       // 0
-      if (typename_expr->ty->base->kind != TY_INT || typename_expr->lhs->kind != ND_NUM || typename_expr->lhs->val != 0)
+      if (typename_expr->lhs->kind != ND_NUM || typename_expr->lhs->val != 0)
         error_tok(arg->tok, "invalid argument");
 
       if (!will_discard)

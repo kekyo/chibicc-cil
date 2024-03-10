@@ -1,5 +1,12 @@
 #include "test.h"
 
+extern void __builtin_va_start(va_list *ap, ...);
+extern void *__builtin_va_arg(va_list *ap, ...);
+
+#define va_start(ap, arg) __builtin_va_start(&(ap), (arg))
+#define va_arg(ap, tn) (*((tn *)__builtin_va_arg(&(ap), (tn *)0)))
+#define va_end(ap)
+
 int ret3(void) {
   return 3;
   return 5;

@@ -1,18 +1,13 @@
 #ifndef __STDARG_H
 #define __STDARG_H
 
-typedef struct {
-  unsigned int gp_offset;
-  unsigned int fp_offset;
-  void *overflow_arg_area;
-  void *reg_save_area;
-} __va_elem;
+typedef __builtin_va_list va_list;
 
-typedef __va_elem va_list[1];
+extern void __builtin_va_start(va_list *ap, ...);
+extern void *__builtin_va_arg(va_list *ap, ...);
 
-#define va_start(ap, last) \
-  do { *(ap) = *(__va_elem *)__va_area__; } while (0)
-
+#define va_start(ap, arg) __builtin_va_start(&(ap), (arg))
+#define va_arg(ap, tn) (*((tn *)__builtin_va_arg(&(ap), (tn *)0)))
 #define va_end(ap)
 
 #define __GNUC_VA_LIST 1
