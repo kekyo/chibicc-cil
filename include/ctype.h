@@ -6,5 +6,6 @@ int ispunct(int c);
 int isalpha(int c);
 int isdigit(int c);
 int isxdigit(int c);
+int isalnum(int c);
 
 #endif
