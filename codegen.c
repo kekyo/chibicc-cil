@@ -11,8 +11,7 @@ struct UsingType
 };
 
 static UsingType *using_type = NULL;
-static int make_ptr_offset = -1;
-static bool avaliable_ptr_offset = false;
+static int lvar_offset = -1;
 
 static void gen_expr(Node *node, bool will_discard);
 static bool gen_stmt(Node *node);
@@ -156,12 +155,10 @@ static char *get_cil_callsite(Node *n) {
 
 // Made native pointer when managed pointer store into it.
 static void gen_make_ptr() {
-  if (!avaliable_ptr_offset) {
-    println("  .local void*");
-    avaliable_ptr_offset = true;
-  }
-  println("  stloc %d", make_ptr_offset);
-  println("  ldloc %d", make_ptr_offset);
+  println("  .local void* __ptr%d$", lvar_offset);
+  println("  stloc __ptr%d$", lvar_offset);
+  println("  ldloc __ptr%d$", lvar_offset);
+  lvar_offset++;
 }
 
 // Compute the absolute address of a given node.
@@ -209,6 +206,13 @@ static void gen_addr(Node *node) {
       gen_expr(node->member->offset, false);
       println("  add");
     }
+    return;
+  case ND_FUNCALL:
+    gen_expr(node, false);
+    println("  .local %s __retval%d$", to_cil_typename(node->ty), lvar_offset);
+    println("  stloc __retval%d$", lvar_offset);
+    println("  ldloca __retval%d$", lvar_offset);
+    lvar_offset++;
     return;
   }
 
@@ -1160,9 +1164,7 @@ static void emit_data_init(Obj *var, bool is_static) {
   }
 
   if (var->init_expr) {
-    make_ptr_offset = 0;
-    avaliable_ptr_offset = false;
-
+    lvar_offset = 0;
     gen_expr(var->init_expr, true);
   }
 }
@@ -1261,14 +1263,13 @@ static void emit_text(Obj *prog) {
     current_fn = fn;
 
     // Prologue
-    make_ptr_offset = 0;
-    avaliable_ptr_offset = false;
+    lvar_offset = 0;
     for (Obj *var = fn->locals; var; var = var->next) {
       if (var->name[0] != '\0')
         println("  .local %s %s", to_cil_typename(var->ty), var->name);
       else
         println("  .local %s", to_cil_typename(var->ty));
-      make_ptr_offset++;
+      lvar_offset++;
     }
 
     // Emit code
