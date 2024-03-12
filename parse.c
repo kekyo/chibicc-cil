@@ -1171,7 +1171,11 @@ static Node *stmt(Token **rest, Token *tok) {
     *rest = skip(tok, ";");
 
     add_type(exp);
-    node->lhs = new_cast(exp, current_fn->ty->return_ty);
+    Type *ty = current_fn->ty->return_ty;
+    if (ty->kind != TY_STRUCT && ty->kind != TY_UNION)
+      exp = new_cast(exp, current_fn->ty->return_ty);
+
+    node->lhs = exp;
     return node;
   }
 
