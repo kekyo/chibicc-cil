@@ -15,6 +15,7 @@ typedef va_list __gnuc_va_list;
 
 #include <stdio.h>
 
+int vsprintf(char *buf, char *fmt, va_list ap);
 int vfprintf(FILE *fp, char *fmt, va_list ap);
 
 #endif
