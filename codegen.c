@@ -460,6 +460,18 @@ static void gen_funcall(Node *node, bool will_discard) {
       node->ty = typename_expr->ty;
       return;
     }
+
+    // Special case: __builtin_va_copy(&dest, &src)
+    if (strcmp(node->lhs->var->name, "__builtin_va_copy") == 0) {
+      if (!node->args || !node->args->next)
+        error_tok(node->tok, "invalid argument");
+      else {
+        gen_expr(node->args, false);
+        gen_expr(node->args->next, false);
+        println("  call __va_copy");
+      }
+      return;
+    }
   }
 
   if (node->func_ty->is_variadic && node->func_ty->params) {  // See **VARARG**

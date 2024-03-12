@@ -28,12 +28,15 @@ int sum2(int x, ...) {
   }
 }
 
-char *fmt(char *buf, char *fmt, ...) {
+void fmt(char *buf, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  vsprintf(buf, fmt, ap);
+
+  va_list ap2;
+  va_copy(ap2, ap);
+  vsprintf(buf, fmt, ap2);
+  va_end(ap2);
   va_end(ap);
-  return buf;
 }
 
 int main() {
