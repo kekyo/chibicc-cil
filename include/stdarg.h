@@ -13,4 +13,8 @@ extern void *__builtin_va_arg(va_list *ap, ...);
 #define __GNUC_VA_LIST 1
 typedef va_list __gnuc_va_list;
 
+#include <stdio.h>
+
+int vfprintf(FILE *fp, char *fmt, va_list ap);
+
 #endif

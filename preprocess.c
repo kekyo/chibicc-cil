@@ -886,6 +886,7 @@ static void init_macros(void) {
   define_macro("__SIZEOF_LONG_DOUBLE__", "8");
   define_macro("__SIZEOF_LONG_LONG__", "8");
   define_macro("__SIZEOF_SHORT__", "2");
+  define_macro("__IEEE_LITTLE_ENDIAN", "1");
   define_macro("__C99_MACRO_WITH_VA_ARGS", "1");
   define_macro("__STDC_HOSTED__", "1");
   define_macro("__STDC_NO_ATOMICS__", "1");
