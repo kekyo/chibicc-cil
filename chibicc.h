@@ -106,6 +106,8 @@ Token *tokenize_file(char *filename);
 // preprocess.c
 //
 
+void init_macros(void);
+void define_macro(char *name, char *buf);
 Token *preprocess(Token *tok);
 
 //

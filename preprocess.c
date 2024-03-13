@@ -831,7 +831,7 @@ static Token *preprocess2(Token *tok) {
   return head.next;
 }
 
-static void define_macro(char *name, char *buf) {
+void define_macro(char *name, char *buf) {
   Token *tok = tokenize(new_file("<built-in>", 1, buf));
   add_macro(name, true, tok);
 }
@@ -854,7 +854,7 @@ static Token *line_macro(Token *tmpl) {
   return new_num_token(tmpl->line_no, tmpl);
 }
 
-static void init_macros(void) {
+void init_macros(void) {
   // Define predefined macros
   switch (mem_model) {
     case M64:
@@ -957,7 +957,6 @@ static void join_adjacent_string_literals(Token *tok1) {
 
 // Entry point function of the preprocessor.
 Token *preprocess(Token *tok) {
-  init_macros();
   tok = preprocess2(tok);
   if (cond_incl)
     error_tok(cond_incl->tok, "unterminated conditional directive");
