@@ -291,6 +291,7 @@ Node *new_num(int64_t val, Token *tok);
 Node *new_flonum(double fval, Type *ty, Token *tok);
 Node *new_typed_num(int64_t val, Type *ty, Token *tok);
 Node *new_sizeof(Type *ty, Token *tok);
+Node *new_var_node(Obj *var, Token *tok);
 Node *new_cast(Node *expr, Type *ty);
 int64_t const_expr(Token **rest, Token *tok);
 Obj *parse(Token *tok);
@@ -382,6 +383,11 @@ struct Member {
   Node *align;
   Node *offset;
   Node *origin_offset;
+
+  // Bitfield
+  bool is_bitfield;
+  int bit_width;
+  Node *bit_offset;
 };
 
 extern Type *ty_void;

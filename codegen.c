@@ -577,6 +577,63 @@ static void gen_sizeof(Type *ty) {
   aggregate_type(ty);
 }
 
+static void gen_const_integer(Type *ty, long val) {
+  switch (ty->kind) {
+    case TY_BOOL:
+      println("  ldc.i4.%d", val ? 1 : 0);
+      return;
+    case TY_CHAR:
+    case TY_SHORT:
+    case TY_INT:
+    case TY_ENUM: {
+      int32_t i32 = (int32_t)val;
+      if (i32 > INT8_MAX || i32 < INT8_MIN)
+        println("  ldc.i4 %d", i32);
+      else if (i32 > 8 || i32 < -1)
+        println("  ldc.i4.s %d", i32);
+      else if (i32 == -1)
+        println("  ldc.i4.m1");
+      else
+        println("  ldc.i4.%d", i32);
+      return;
+    }
+    case TY_LONG: {
+      if (val > INT32_MAX || val < INT32_MIN) {
+        println("  ldc.i8 %ld", val);
+      } else if (val > INT8_MAX || val < INT8_MIN) {
+        println("  ldc.i4 %ld", val);
+        println("  conv.i8");
+      } else if (val > 8 || val < -1) {
+        println("  ldc.i4.s %ld", val);
+        println("  conv.i8");
+      } else if (val == -1) {
+        println("  ldc.i4.m1");
+        println("  conv.i8");
+      } else {
+        println("  ldc.i4.%ld", val);
+        println("  conv.i8");
+      }
+      return;
+    }
+    case TY_NINT:
+    case TY_PTR: {
+      if (val > INT32_MAX || val < INT32_MIN)
+        println("  ldc.i8 %ld", val);
+      else if (val > INT8_MAX || val < INT8_MIN)
+        println("  ldc.i4 %ld", val);
+      else if (val > 8 || val < -1)
+        println("  ldc.i4.s %ld", val);
+      else if (val == -1)
+        println("  ldc.i4.m1");
+      else
+        println("  ldc.i4.%ld", val);
+      println("  conv.i");
+      return;
+    }
+  }
+  unreachable();
+}
+
 // If will_discard is true, the result must be discarded.
 static void gen_expr(Node *node, bool will_discard) {
   if (node->tok)
@@ -594,21 +651,14 @@ static void gen_expr(Node *node, bool will_discard) {
     if (!will_discard) {
       switch (node->ty->kind) {
         case TY_BOOL:
-          println("  ldc.i4.%d", node->val ? 1 : 0);
-          return;
         case TY_CHAR:
         case TY_SHORT:
         case TY_INT:
         case TY_ENUM:
-          println("  ldc.i4 %d", (int32_t)node->val);
-          return;
         case TY_LONG:
-          println("  ldc.i8 %ld", node->val);
-          return;
         case TY_NINT:
         case TY_PTR:
-          println("  ldc.i8 %ld", node->val);
-          println("  conv.i");
+          gen_const_integer(node->ty, node->val);
           return;
         case TY_FLOAT:
           println("  ldc.r4 %f", (float)node->fval);
@@ -626,12 +676,32 @@ static void gen_expr(Node *node, bool will_discard) {
       println("  neg");
     return;
   case ND_VAR:
-  case ND_MEMBER:
     if (!will_discard) {
       gen_addr(node);
       load(node->ty);
     }
     return;
+  case ND_MEMBER: {
+    if (!will_discard) {
+      gen_addr(node);
+      load(node->ty);
+      
+      Member *mem = node->member;
+      if (mem->is_bitfield) {
+        gen_const_integer(ty_int, 64 - mem->bit_width);
+        gen_expr(mem->bit_offset, false);
+        println("  sub");
+        println("  shl");
+
+        gen_const_integer(ty_int, 64 - mem->bit_width);
+        if (mem->ty->is_unsigned)
+          println("  shr.un");
+        else
+          println("  shr");
+      }
+    }
+    return;
+  }
   case ND_DEREF:
     gen_expr(node->lhs, will_discard);
     if (!will_discard)
@@ -646,11 +716,39 @@ static void gen_expr(Node *node, bool will_discard) {
       gen_sizeof(node->sizeof_ty);
     return;
   case ND_ASSIGN:
-    gen_addr(node->lhs);
-    if (!will_discard)
-      println("  dup");
-    gen_expr(node->rhs, false);
-    store(node->ty);
+    gen_addr(node->lhs);    // lvalue addr
+    if (!will_discard) {
+      println("  dup");     // lvalue addr
+    }
+
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      // If the lhs is a bitfield, we need to read the current value
+      // from memory and merge it with a new value.
+      Member *mem = node->lhs->member;
+      println("  dup");    // lvalue addr
+      load(ty_ulong);      // lvalue
+
+      gen_const_integer(ty_ulong, (1L << mem->bit_width) - 1);
+      gen_expr(mem->bit_offset, false);
+      println("  shl");
+      println("  not");
+      println("  and");
+
+      gen_expr(node->rhs, false);    // rvalue
+      println("  conv.u8");
+
+      gen_const_integer(ty_ulong, (1L << mem->bit_width) - 1);
+      println("  and");
+      gen_expr(mem->bit_offset, false);
+      println("  shl");
+      println("  or");
+
+      store(ty_ulong);
+    } else {
+      gen_expr(node->rhs, false);
+      store(node->ty);
+    }
+
     if (!will_discard)
       load(node->ty);
     return;
@@ -857,6 +955,7 @@ static void gen_dummy_value(Type *ty) {
   case TY_NINT:
   case TY_PTR:
   case TY_ARRAY:
+  case TY_FUNC:
     println("  ldc.i4.0");
     println("  conv.i");
     return;
@@ -1048,6 +1147,17 @@ static char *safe_to_cil_typename(Type *ty) {
   }
 }
 
+static Node *get_var_interior(Node *node)
+{
+  // Because maybe displacement node is cached.
+  if (node->kind == ND_VAR) {
+    Node *init_expr = node->var->init_expr;
+    if (init_expr != NULL && init_expr->kind == ND_ASSIGN)
+      return init_expr->rhs;
+  }
+  return node;
+}
+
 static void emit_type(Obj *prog) {
   while (using_type) {
     Type *ty = using_type->ty;
@@ -1064,33 +1174,47 @@ static void emit_type(Obj *prog) {
         Node zero = {ND_NUM, 0};
         Node *last_offset = &zero;
         Node *last_size = &zero;
+        int bit_index = 0;
+        int bit_width = 0;
         for (Member *mem = ty->members; mem; mem = mem->next) {
-          // Exactly equals both offsets.
-          if (equals_node(mem->offset, mem->origin_offset))
-            println("  public %s %s", safe_to_cil_typename(mem->ty), get_string(mem->name));
-          // Couldn't adjust with padding when offset/size is not concrete.
-          // (Because mem->offset and ty->size are reduced.)
-          else if (mem->offset->kind != ND_NUM || last_size->kind != ND_NUM)
-            error_tok(mem->name, "Could not adjust on alignment this member.");
-          // (Assertion for concrete numeric value.)
-          else if (last_offset->kind == ND_NUM) {
-            int64_t pad_start = last_offset->val + last_size->val;
-            int64_t pad_size = mem->offset->val - pad_start;
-            if (pad_size >= 1)
-              println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
-            println("  public %s %s", safe_to_cil_typename(mem->ty), get_string(mem->name));
-          } else
-            unreachable();
-          last_offset = mem->offset;
-          last_size = mem->ty->size;
+          if (mem->is_bitfield) {
+            bit_width += mem->bit_width;
+            while (bit_width >= 8) {
+              println("  public uint8 __bitfield%d", bit_index++);
+              bit_width -= 8;
+            }
+          } else {
+            if (bit_width >= 1) {
+              println("  public uint8 __bitfield%d", bit_index++);
+              bit_width = 0;
+            }
+            // Exactly equals both offsets.
+            if (equals_node(get_var_interior(mem->offset), mem->origin_offset))
+              println("  public %s %s", safe_to_cil_typename(mem->ty), get_string(mem->name));
+            // Couldn't adjust with padding when offset/size is not concrete.
+            // (Because mem->offset and ty->size are reduced.)
+            else if (get_var_interior(mem->offset)->kind != ND_NUM || last_size->kind != ND_NUM)
+              error_tok(mem->name, "Could not adjust on alignment this member.");
+            // (Assertion for concrete numeric value.)
+            else if (last_offset->kind == ND_NUM) {
+              int64_t pad_start = last_offset->val + last_size->val;
+              int64_t pad_size = get_var_interior(mem->offset)->val - pad_start;
+              if (pad_size >= 1)
+                println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
+              println("  public %s %s", safe_to_cil_typename(mem->ty), get_string(mem->name));
+            } else
+              unreachable();
+          }
+          last_offset = get_var_interior(mem->offset);
+          last_size = get_var_interior(mem->ty->size);
         }
         // Not equals both sizes.
-        if (!equals_node(ty->size, ty->origin_size)) {
-          if (ty->size->kind != ND_NUM || last_size->kind != ND_NUM)
+        if (!equals_node(get_var_interior(ty->size), ty->origin_size)) {
+          if (get_var_interior(ty->size)->kind != ND_NUM || last_size->kind != ND_NUM)
             error_tok(ty->name, "Could not adjust on alignment this type.");
           else if (last_offset->kind == ND_NUM) {
             int64_t pad_start = last_offset->val + last_size->val;
-            int64_t pad_size = ty->size->val - pad_start;
+            int64_t pad_size = get_var_interior(ty->size)->val - pad_start;
             if (pad_size >= 1)
               println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
           } else
@@ -1103,11 +1227,11 @@ static void emit_type(Obj *prog) {
         for (Member *mem = ty->members; mem; mem = mem->next)
           println("  public %s %s 0", safe_to_cil_typename(mem->ty), get_string(mem->name));
         // Not equals both sizes.
-        if (!equals_node(ty->size, ty->origin_size)) {
-          if (ty->size->kind != ND_NUM)
+        if (!equals_node(get_var_interior(ty->size), ty->origin_size)) {
+          if (get_var_interior(ty->size)->kind != ND_NUM)
             error_tok(ty->name, "Could not adjust on alignment this type.");
-          else if (ty->size->val >= 1)
-            println("  internal uint8[%ld] $pad_$0 0", ty->size->val);
+          else if (get_var_interior(ty->size)->val >= 1)
+            println("  internal uint8[%ld] $pad_$0 0", get_var_interior(ty->size)->val);
         }
         break;
     }

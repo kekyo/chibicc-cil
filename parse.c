@@ -121,6 +121,10 @@ static bool is_function(Token *tok);
 static Token *function(Token *tok, Type *basety, VarAttr *attr);
 static Token *global_variable(Token *tok, Type *basety, VarAttr *attr);
 
+static Node *align_down_node(Node *n, Node *align) {
+  return align_to_node(new_add(new_sub(n, align, n->tok), new_typed_num(1, ty_nuint, n->tok), n->tok), align);
+}
+
 static void enter_scope(void) {
   Scope *sc = calloc(1, sizeof(Scope));
   sc->next = scope;
@@ -198,10 +202,9 @@ Node *new_sizeof(Type *ty, Token *tok) {
   return node;
 }
 
-static Node *new_var_node(Obj *var, Token *tok) {
+Node *new_var_node(Obj *var, Token *tok) {
   Node *node = new_node(ND_VAR, tok);
   node->var = var;
-  node->is_reduced = true;
   return node;
 }
 
@@ -1117,7 +1120,6 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
   // initializing it with user-supplied values.
   Node *lhs = new_node(ND_MEMZERO, tok);
   lhs->var = var;
-  lhs->is_reduced = true;
 
   Node *rhs = create_lvar_init(init, var->ty, &desg, tok);
   return new_binary(ND_COMMA, lhs, rhs, tok);
@@ -1959,10 +1961,13 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
       mem->ty = declarator(&tok, tok, basety);
       mem->name = mem->ty->name;
       mem->idx = idx++;
-      if (attr.align)
-        mem->align = attr.align;
-      else
-        mem->align = mem->ty->align;
+      mem->align = attr.align ? attr.align : mem->ty->align;
+
+      if (consume(&tok, tok, ":")) {
+        mem->is_bitfield = true;
+        mem->bit_width = const_expr(&tok, tok);
+      }
+
       cur = cur->next = mem;
     }
   }
@@ -2038,7 +2043,7 @@ static Node *max_node(Node *lhs, Node *rhs)
     return cond;
 }
 
-static Node *reduce_and_cache_size(Node *node) {
+static Node *reduce_and_cache_disp(Node *node) {
   node = reduce_node(node);
   switch (node->kind) {
   case ND_ADD:
@@ -2072,33 +2077,143 @@ static Type *struct_decl(Token **rest, Token *tok) {
   // Assign offsets within the struct to members.
   Node *node0 = new_typed_num(0, ty_nuint, NULL);   // (size_t)0
   Node *node1 = new_typed_num(1, ty_nuint, NULL);   // (size_t)1
-  Node *offset = node0;
+  Node *node8 = new_typed_num(8, ty_nuint, NULL);   // (size_t)8
+  Node *bits = node0;
+  Node *origin_bits = node0;
   Node *align = node1;
   Node *origin_align = node1;
-
   for (Member *mem = ty->members; mem; mem = mem->next) {
-    // mem->origin_offset = align_to(offset, mem->ty->align)
-    mem->origin_offset = reduce_node(align_to_node(offset, mem->ty->align));
-    // offset = align_to(offset, mem->align)
-    offset = reduce_and_cache_size(align_to_node(offset, mem->align));
+    if (mem->is_bitfield) {
+      // int sz = mem->ty->size;
+      Node *sz8 = new_binary(ND_MUL, mem->ty->size, node8, NULL);
 
-    mem->offset = offset;
+      // origin_bits = (origin_bits / (sz * 8) != (origin_bits + mem->bit_width - 1) / (sz * 8)) ?
+      //    align_to(origin_bits, sz * 8) : origin_bits
+      Node *origin_cond = new_node(ND_COND, NULL);
+      origin_cond->cond = new_binary(ND_NE,
+        new_binary(ND_DIV, origin_bits, sz8, NULL),
+        new_binary(ND_DIV,
+          new_binary(ND_SUB,
+            new_binary(ND_ADD,
+              origin_bits,
+              new_typed_num(mem->bit_width, ty_nuint, NULL),
+              NULL),
+            node1, NULL),
+          sz8, NULL),
+        NULL);
+      origin_cond->then = align_to_node(origin_bits, sz8);
+      origin_cond->els = origin_bits;
+      origin_bits = reduce_node(origin_cond);
 
-    // offset = offset + mem->ty->size
-    offset = reduce_and_cache_size(new_binary(ND_ADD, offset, mem->ty->size, NULL));
+      // bits = (bits / (sz * 8) != (bits + mem->bit_width - 1) / (sz * 8)) ?
+      //    align_to(bits, sz * 8) : bits
+      Node *cond = new_node(ND_COND, NULL);
+      cond->cond = new_binary(ND_NE,
+        new_binary(ND_DIV, bits, sz8, NULL),
+        new_binary(ND_DIV,
+          new_binary(ND_SUB,
+            new_binary(ND_ADD,
+              bits,
+              new_typed_num(mem->bit_width, ty_nuint, NULL),
+              NULL),
+            node1, NULL),
+          sz8, NULL),
+        NULL);
+      cond->then = align_to_node(bits, sz8);
+      cond->els = bits;
+      bits = reduce_node(cond);
+
+      // mem->origin_offset = align_down(origin_bits / 8, sz);
+      mem->origin_offset = reduce_node(
+        align_down_node(
+          new_binary(ND_DIV, origin_bits, node8, NULL),
+          mem->ty->size));
+
+      // mem->offset = align_down(bits / 8, sz);
+      mem->offset = reduce_and_cache_disp(
+        align_down_node(
+          new_binary(ND_DIV, bits, node8, NULL),
+          mem->ty->size));
+
+      // mem->bit_offset = bits % (sz * 8);
+      mem->bit_offset = reduce_and_cache_disp(
+        new_binary(ND_MOD, bits, sz8, NULL));
+
+      // origin_bits += mem->bit_width;
+      origin_bits = reduce_node(
+        new_binary(ND_ADD,
+          origin_bits,
+          new_typed_num(mem->bit_width, ty_nuint, NULL),
+          NULL));
+
+      // bits += mem->bit_width;
+      bits = reduce_node(
+        new_binary(ND_ADD,
+          bits,
+          new_typed_num(mem->bit_width, ty_nuint, NULL),
+          NULL));
+    } else {
+      // origin_bits = align_to(origin_bits, mem->ty->align * 8)
+      origin_bits = reduce_node(
+        align_to_node(
+          origin_bits, new_binary(ND_MUL, mem->ty->align, node8, NULL)));
+
+      // mem->origin_offset = origin_bits / 8
+      mem->origin_offset = reduce_node(
+        new_binary(ND_DIV, origin_bits, node8, NULL));
+
+      // origin_bits = origin_bits + mem->ty->size * 8
+      origin_bits = reduce_node(
+        new_binary(ND_ADD,
+          origin_bits,
+          new_binary(ND_MUL, mem->ty->size, node8, NULL),
+          NULL));
+
+      // bits = align_to(bits, mem->align * 8)
+      bits = reduce_node(
+        align_to_node(
+          bits, new_binary(ND_MUL, mem->align, node8, NULL)));
+
+      // mem->offset = bits / 8
+      mem->offset = reduce_and_cache_disp(
+        new_binary(ND_DIV, bits, node8, NULL));
+
+      // bits = bits + mem->ty->size * 8
+      bits = reduce_node(
+        new_binary(ND_ADD,
+          bits,
+          new_binary(ND_MUL, mem->ty->size, node8, NULL),
+          NULL));
+    }
 
     // origin_align = max(origin_align, mem->ty->align)
-    origin_align = reduce_node(max_node(origin_align, mem->ty->align));
+    origin_align = reduce_node(
+      max_node(origin_align, mem->ty->align));
+
     // align = max(align, mem->align)
-    align = reduce_and_cache_size(max_node(align, mem->align));
+    align = reduce_and_cache_disp(
+      max_node(align, mem->align));
   }
 
-  ty->align = reduce_and_cache_size(align);
+  ty->align = align;
 
-  // ty->size = align_to(offset, ty->align)
-  ty->size = reduce_and_cache_size(align_to_node(offset, ty->align));
-  // ty->origin_size = align_to(offset, origin_align)
-  ty->origin_size = reduce_node(align_to_node(offset, origin_align));
+  // ty->origin_size = align_to(origin_bits, origin_align * 8) / 8
+  ty->origin_size = reduce_node(
+    new_binary(ND_DIV,
+      align_to_node(
+        origin_bits,
+        new_binary(ND_MUL, origin_align, node8, NULL)),
+        node8,
+        NULL));
+
+  // ty->size = align_to(offset, align * 8) / 8
+  ty->size = reduce_and_cache_disp(
+    new_binary(ND_DIV,
+      align_to_node(
+        bits,
+        new_binary(ND_MUL, align, node8, NULL)),
+        node8,
+        NULL));
 
   return ty;
 }
@@ -2124,19 +2239,19 @@ static Type *union_decl(Token **rest, Token *tok) {
     mem->origin_offset = node0;
 
     // align = max(align, mem->align)
-    align = reduce_and_cache_size(max_node(align, mem->align));
+    align = reduce_and_cache_disp(max_node(align, mem->align));
     // origin_align = max(origin_align, mem->ty->align)
     origin_align = reduce_node(max_node(origin_align, mem->ty->align));
     // size = max(size, mem->ty->size)
-    size = reduce_and_cache_size(max_node(size, mem->ty->size));
+    size = reduce_and_cache_disp(max_node(size, mem->ty->size));
   }
 
-  ty->align = reduce_and_cache_size(align);
+  ty->align = reduce_and_cache_disp(align);
 
   // ty->origin_size = align_to(size, origin_align)
   ty->origin_size = reduce_node(align_to_node(size, origin_align));
   // ty->size = align_to(size, ty->align)
-  ty->size = reduce_and_cache_size(align_to_node(size, ty->align));
+  ty->size = reduce_and_cache_disp(align_to_node(size, ty->align));
 
   return ty;
 }
