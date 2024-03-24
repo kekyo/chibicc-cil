@@ -16,3 +16,4 @@ int strncmp(char *p, char *q, size_t n);
 int memcmp(char *p, char *q, size_t n);
 void exit(int code);
 int getptrsize();
+long strlen(char *s);
