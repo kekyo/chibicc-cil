@@ -2116,73 +2116,79 @@ static Type *struct_decl(Token **rest, Token *tok) {
       // int sz = mem->ty->size;
       Node *sz8 = new_binary(ND_MUL, mem->ty->size, node8, NULL);
 
-      // origin_bits = (origin_bits / (sz * 8) != (origin_bits + mem->bit_width - 1) / (sz * 8)) ?
-      //    align_to(origin_bits, sz * 8) : origin_bits
-      Node *origin_cond = new_node(ND_COND, NULL);
-      origin_cond->cond = new_binary(ND_NE,
-        new_binary(ND_DIV, origin_bits, sz8, NULL),
-        new_binary(ND_DIV,
-          new_binary(ND_SUB,
-            new_binary(ND_ADD,
-              origin_bits,
-              new_typed_num(mem->bit_width, ty_nuint, NULL),
-              NULL),
-            node1, NULL),
-          sz8, NULL),
-        NULL);
-      origin_cond->then = align_to_node(origin_bits, sz8);
-      origin_cond->els = origin_bits;
-      origin_bits = reduce_node(origin_cond);
+      if (mem->is_bitfield && mem->bit_width == 0)
+        // Zero-width anonymous bitfield has a special meaning.
+        // It affects only alignment.
+        bits = align_to_node(bits, sz8);
+      else {
+        // origin_bits = (origin_bits / (sz * 8) != (origin_bits + mem->bit_width - 1) / (sz * 8)) ?
+        //    align_to(origin_bits, sz * 8) : origin_bits
+        Node *origin_cond = new_node(ND_COND, NULL);
+        origin_cond->cond = new_binary(ND_NE,
+          new_binary(ND_DIV, origin_bits, sz8, NULL),
+          new_binary(ND_DIV,
+            new_binary(ND_SUB,
+              new_binary(ND_ADD,
+                origin_bits,
+                new_typed_num(mem->bit_width, ty_nuint, NULL),
+                NULL),
+              node1, NULL),
+            sz8, NULL),
+          NULL);
+        origin_cond->then = align_to_node(origin_bits, sz8);
+        origin_cond->els = origin_bits;
+        origin_bits = reduce_node(origin_cond);
 
-      // bits = (bits / (sz * 8) != (bits + mem->bit_width - 1) / (sz * 8)) ?
-      //    align_to(bits, sz * 8) : bits
-      Node *cond = new_node(ND_COND, NULL);
-      cond->cond = new_binary(ND_NE,
-        new_binary(ND_DIV, bits, sz8, NULL),
-        new_binary(ND_DIV,
-          new_binary(ND_SUB,
-            new_binary(ND_ADD,
-              bits,
-              new_typed_num(mem->bit_width, ty_nuint, NULL),
-              NULL),
-            node1, NULL),
-          sz8, NULL),
-        NULL);
-      cond->then = align_to_node(bits, sz8);
-      cond->els = bits;
-      bits = reduce_node(cond);
+        // bits = (bits / (sz * 8) != (bits + mem->bit_width - 1) / (sz * 8)) ?
+        //    align_to(bits, sz * 8) : bits
+        Node *cond = new_node(ND_COND, NULL);
+        cond->cond = new_binary(ND_NE,
+          new_binary(ND_DIV, bits, sz8, NULL),
+          new_binary(ND_DIV,
+            new_binary(ND_SUB,
+              new_binary(ND_ADD,
+                bits,
+                new_typed_num(mem->bit_width, ty_nuint, NULL),
+                NULL),
+              node1, NULL),
+            sz8, NULL),
+          NULL);
+        cond->then = align_to_node(bits, sz8);
+        cond->els = bits;
+        bits = reduce_node(cond);
 
-      // mem->origin_offset = align_down(origin_bits / 8, sz);
-      mem->origin_offset = reduce_node(
-        align_down_node(
-          new_binary(ND_DIV, origin_bits, node8, NULL),
-          mem->ty->size));
+        // mem->origin_offset = align_down(origin_bits / 8, sz);
+        mem->origin_offset = reduce_node(
+          align_down_node(
+            new_binary(ND_DIV, origin_bits, node8, NULL),
+            mem->ty->size));
 
-      // mem->offset = align_down(bits / 8, sz);
-      mem->offset = reduce_and_cache_disp(
-        align_down_node(
-          new_binary(ND_DIV, bits, node8, NULL),
-          mem->ty->size));
+        // mem->offset = align_down(bits / 8, sz);
+        mem->offset = reduce_and_cache_disp(
+          align_down_node(
+            new_binary(ND_DIV, bits, node8, NULL),
+            mem->ty->size));
 
-      // mem->bit_offset = (int)(bits % (sz * 8));
-      mem->bit_offset = reduce_and_cache_disp(
-        new_cast(
-          new_binary(ND_MOD, bits, sz8, NULL),
-          ty_int));
+        // mem->bit_offset = (int)(bits % (sz * 8));
+        mem->bit_offset = reduce_and_cache_disp(
+          new_cast(
+            new_binary(ND_MOD, bits, sz8, NULL),
+            ty_int));
 
-      // origin_bits += mem->bit_width;
-      origin_bits = reduce_node(
-        new_binary(ND_ADD,
-          origin_bits,
-          new_typed_num(mem->bit_width, ty_nuint, NULL),
-          NULL));
+        // origin_bits += mem->bit_width;
+        origin_bits = reduce_node(
+          new_binary(ND_ADD,
+            origin_bits,
+            new_typed_num(mem->bit_width, ty_nuint, NULL),
+            NULL));
 
-      // bits += mem->bit_width;
-      bits = reduce_node(
-        new_binary(ND_ADD,
-          bits,
-          new_typed_num(mem->bit_width, ty_nuint, NULL),
-          NULL));
+        // bits += mem->bit_width;
+        bits = reduce_node(
+          new_binary(ND_ADD,
+            bits,
+            new_typed_num(mem->bit_width, ty_nuint, NULL),
+            NULL));
+      }
     } else {
       // origin_bits = align_to(origin_bits, mem->ty->align * 8)
       origin_bits = reduce_node(
