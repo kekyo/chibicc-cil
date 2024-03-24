@@ -308,7 +308,7 @@ static char *new_unique_name(const char *name) {
   while (*pc != 0) {
     if (!(isalpha(*pc) || isdigit(*pc)))
       *pc = '_';
-      pc++;
+    pc++;
   }
   return format("_L%d$_%s", id++, p);
 }
@@ -324,13 +324,6 @@ static Obj *new_string_literal(char *p, Type *ty) {
     var->init_data_size = ty->array_len;
   else
     unreachable();
-  return var;
-}
-
-static Obj *new_raw_data_literal(char *p, int size, Type *ty) {
-  Obj *var = new_anon_gvar(ty, p);
-  var->init_data = p;
-  var->init_data_size = size;
   return var;
 }
 

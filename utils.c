@@ -375,12 +375,12 @@ static void verify_assert(bool assertion) {
 }
 
 static void verify_c_str(char *p) {
-  int len = strlen(p);
+  (void)strlen(p);
 }
 
 static void verify_c_str_len(char *p, int len) {
   for (int i = 0; i < len; i++) {
-    char c = *(p + i);
+    (void)*(p + i);
   }
 }
 
@@ -844,9 +844,9 @@ static bool is_flonum_equals(Node *node, double fval) {
   return node->kind == ND_NUM && is_flonum(node->ty) && node->fval == fval;
 }
 
-static bool is_flonum_not_equals(Node *node, double fval) {
-  return node->kind == ND_NUM && is_flonum(node->ty) && node->fval != fval;
-}
+//static bool is_flonum_not_equals(Node *node, double fval) {
+//  return node->kind == ND_NUM && is_flonum(node->ty) && node->fval != fval;
+//}
 
 static Node *reduce_(Node *node) {
   Node *lhs;

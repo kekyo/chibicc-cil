@@ -3,7 +3,7 @@
 AS=chibias
 #AS=../chibias-cil/chibias/bin/Debug/net6.0/chibias
 
-CFLAGS=-std=c11 -g -fno-common
+CFLAGS=-std=c11 -g -fno-common -Wall -Wno-switch
 
 LIBC=../libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll
 

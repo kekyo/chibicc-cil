@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdnoreturn.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
@@ -85,9 +86,9 @@ struct Token {
   Token *origin;    // If this is expanded from a macro, the original token
 };
 
-void error(char *fmt, ...);
-void error_at(char *loc, char *fmt, ...);
-void error_tok(Token *tok, char *fmt, ...);
+noreturn void error(char *fmt, ...);
+noreturn void error_at(char *loc, char *fmt, ...);
+noreturn void error_tok(Token *tok, char *fmt, ...);
 void warn_tok(Token *tok, char *fmt, ...);
 char *get_string(Token *tok);
 bool equal(Token *tok, char *op);
