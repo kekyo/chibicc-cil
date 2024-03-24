@@ -153,6 +153,13 @@ static char *get_cil_callsite(Node *n) {
   return n->cil_callsite;
 }
 
+static char *gen_make_temp(Type *ty) {
+  char *name = format("__temp%d$", lvar_offset);
+  println("  .local %s %s", to_cil_typename(ty), name);
+  lvar_offset++;
+  return name;
+}
+
 // Made native pointer when managed pointer store into it.
 static void gen_make_ptr() {
   println("  .local void* __ptr%d$", lvar_offset);
@@ -684,10 +691,11 @@ static void gen_expr(Node *node, bool will_discard) {
   case ND_MEMBER: {
     if (!will_discard) {
       gen_addr(node);
-      load(node->ty);
       
       Member *mem = node->member;
       if (mem->is_bitfield) {
+        load(ty_long);
+
         gen_const_integer(ty_int, 64 - mem->bit_width);
         gen_expr(mem->bit_offset, false);
         println("  sub");
@@ -698,7 +706,10 @@ static void gen_expr(Node *node, bool will_discard) {
           println("  shr.un");
         else
           println("  shr");
-      }
+
+        cast(ty_long, node->ty);
+      } else
+        load(node->ty);
     }
     return;
   }
@@ -716,41 +727,50 @@ static void gen_expr(Node *node, bool will_discard) {
       gen_sizeof(node->sizeof_ty);
     return;
   case ND_ASSIGN:
-    gen_addr(node->lhs);    // lvalue addr
-    if (!will_discard) {
-      println("  dup");     // lvalue addr
-    }
+    gen_addr(node->lhs);
 
     if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
       // If the lhs is a bitfield, we need to read the current value
       // from memory and merge it with a new value.
       Member *mem = node->lhs->member;
-      println("  dup");    // lvalue addr
-      load(ty_ulong);      // lvalue
+      println("  dup");
+      load(ty_long);
 
-      gen_const_integer(ty_ulong, (1L << mem->bit_width) - 1);
+      gen_const_integer(ty_long, (1L << mem->bit_width) - 1);
       gen_expr(mem->bit_offset, false);
       println("  shl");
       println("  not");
       println("  and");
 
-      gen_expr(node->rhs, false);    // rvalue
-      println("  conv.u8");
+      gen_expr(node->rhs, false);
+      println("  conv.i8");
 
-      gen_const_integer(ty_ulong, (1L << mem->bit_width) - 1);
+      char *temp_name;
+      if (!will_discard) {
+        temp_name = gen_make_temp(ty_long);
+        println("  stloc %s", temp_name);
+        println("  ldloc %s", temp_name);
+      }
+
+      gen_const_integer(ty_long, (1L << mem->bit_width) - 1);
       println("  and");
       gen_expr(mem->bit_offset, false);
       println("  shl");
       println("  or");
 
-      store(ty_ulong);
+      store(ty_long);
+      if (!will_discard) {
+        println("  ldloc %s", temp_name);
+        cast(ty_long, node->ty);
+      }
     } else {
+      if (!will_discard)
+        println("  dup");
       gen_expr(node->rhs, false);
       store(node->ty);
+      if (!will_discard)
+        load(node->ty);
     }
-
-    if (!will_discard)
-      load(node->ty);
     return;
   case ND_STMT_EXPR: {
     bool dead = false;
