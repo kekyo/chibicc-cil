@@ -385,11 +385,11 @@ static char convr8[] = "conv.r8";
 
 static char *cast_table[][12] = {
 // to i8    i16     i32     i64     nint       u8      u16     u32     u64     nuint      f32       f64             // from
-  { NULL,   NULL,   NULL,   convi8, convnint,  NULL,   NULL,   NULL,   convi8, convnint,  convr4,   convr8,  },    // i8
-  { convi1, NULL,   NULL,   convi8, convnint,  convu1, NULL,   NULL,   convi8, convnint,  convr4,   convr8,  },    // i16
-  { convi1, convi2, NULL,   convi8, convnint,  convu1, convu2, NULL,   convi8, convnint,  convr4,   convr8,  },    // i32
-  { convi1, convi2, convi4, NULL,   convnint,  convu1, convu2, convu4, NULL,   convnint,  convr4,   convr8,  },    // i64
-  { convi1, convi2, convi4, convi8, NULL,      convu1, convu2, convu4, convi8, NULL,      convr4,   convr8,  },    // nint
+  { NULL,   NULL,   NULL,   convi8, convnint,  convu1, convu2, convu4, convi8, convnint,  convr4,   convr8,  },    // i8
+  { convi1, NULL,   NULL,   convi8, convnint,  convu1, convu2, convu4, convi8, convnint,  convr4,   convr8,  },    // i16
+  { convi1, convi2, NULL,   convi8, convnint,  convu1, convu2, convu4, convi8, convnint,  convr4,   convr8,  },    // i32
+  { convi1, convi2, convi4, NULL,   convnint,  convu1, convu2, convu4, convi8, convnint,  convr4,   convr8,  },    // i64
+  { convi1, convi2, convi4, convi8, NULL,      convu1, convu2, convu4, convi8, convnint,  convr4,   convr8,  },    // nint
   { NULL,   NULL,   NULL,   convu8, convnuint, NULL,   NULL,   NULL,   convu8, convnuint, convrun,  convrun, },    // u8
   { convu1, NULL,   NULL,   convu8, convnuint, convu1, NULL,   NULL,   convu8, convnuint, convrun,  convrun, },    // u16
   { convu1, convu2, NULL,   convu8, convnuint, convu1, convu2, NULL,   convu8, convnuint, convrun,  convrun, },    // u32
@@ -402,7 +402,7 @@ static char *cast_table[][12] = {
 static void cast(Type *from, Type *to) {
   if (from == to)
     return;
-  if (from->kind == to->kind)
+  if (from->kind == to->kind && from->is_unsigned == to->is_unsigned)
     return;
   if (to->kind == TY_VOID)
     return;
@@ -700,10 +700,12 @@ static void gen_expr(Node *node, bool will_discard) {
             // Local variable
             case OB_LOCAL:
               println("  ldloc %d", node->var->offset);
+              cast(node->var->ty, node->ty);
               return;
             // Parameter variable
             case OB_PARAM:
               println("  ldarg %d", node->var->offset);
+              cast(node->var->ty, node->ty);
               return;
           }
           break;
@@ -804,16 +806,22 @@ static void gen_expr(Node *node, bool will_discard) {
             // Local variable
             case OB_LOCAL:
               gen_expr(node->rhs, false);
+              cast(node->rhs->ty, node->lhs->var->ty);
               println("  stloc %d", node->lhs->var->offset);
-              if (!will_discard)
+              if (!will_discard) {
                 println("  ldloc %d", node->lhs->var->offset);
+                cast(node->lhs->var->ty, node->ty);
+              }
               return;
             // Parameter variable
             case OB_PARAM:
               gen_expr(node->rhs, false);
+              cast(node->rhs->ty, node->lhs->var->ty);
               println("  starg %d", node->lhs->var->offset);
-              if (!will_discard)
+              if (!will_discard) {
                 println("  ldarg %d", node->lhs->var->offset);
+                cast(node->lhs->var->ty, node->ty);
+              }
               return;
           }
           break;
