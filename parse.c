@@ -1107,15 +1107,21 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
   Initializer *init = initializer(rest, tok, var->ty, &var->ty);
   InitDesg desg = {NULL, 0, NULL, var};
 
-  // If a partial initializer list is given, the standard requires
-  // that unspecified elements are set to 0. Here, we simply
-  // zero-initialize the entire memory region of a variable before
-  // initializing it with user-supplied values.
-  Node *lhs = new_node(ND_MEMZERO, tok);
-  lhs->var = var;
+  if (var->ty->kind != TY_ARRAY &&
+      var->ty->kind != TY_STRUCT &&
+      var->ty->kind != TY_UNION)
+    return create_lvar_init(init, var->ty, &desg, tok);
+  else {
+    // If a partial initializer list is given, the standard requires
+    // that unspecified elements are set to 0. Here, we simply
+    // zero-initialize the entire memory region of a variable before
+    // initializing it with user-supplied values.
+    Node *lhs = new_node(ND_MEMZERO, tok);
+    lhs->var = var;
 
-  Node *rhs = create_lvar_init(init, var->ty, &desg, tok);
-  return new_binary(ND_COMMA, lhs, rhs, tok);
+    Node *rhs = create_lvar_init(init, var->ty, &desg, tok);
+    return new_binary(ND_COMMA, lhs, rhs, tok);
+  }
 }
 
 static void gvar_initializer(Token **rest, Token *tok, Obj *var) {
