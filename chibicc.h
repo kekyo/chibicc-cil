@@ -456,6 +456,8 @@ int64_t get_by_integer(Node *node);
 
 int encode_utf8(char *buf, uint32_t c);
 uint32_t decode_utf8(char **new_pos, char *p);
+bool is_ident1(uint32_t c);
+bool is_ident2(uint32_t c);
 
 //
 // codegen.c
