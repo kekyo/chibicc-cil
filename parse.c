@@ -851,8 +851,24 @@ static void string_initializer(Token **rest, Token *tok, Initializer *init) {
     *init = *new_initializer(array_of(init->ty->base, tok->ty->array_len, tok), false);
 
   int len = MIN(init->ty->array_len, tok->ty->array_len);
-  for (int i = 0; i < len; i++)
-    init->children[i]->expr = new_num(tok->str[i], tok);
+
+  switch (init->ty->base->kind) {
+  case TY_CHAR: {
+    uint8_t *str = (uint8_t *)tok->str;
+    for (int i = 0; i < len; i++)
+      init->children[i]->expr = new_num(str[i], tok);
+    break;
+  }
+  case TY_SHORT: {
+    uint16_t *str = (uint16_t *)tok->str;
+    for (int i = 0; i < len; i++)
+      init->children[i]->expr = new_num(str[i], tok);
+    break;
+  }
+  default:
+    unreachable();
+  }
+
   *rest = tok->next;
 }
 
