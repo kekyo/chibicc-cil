@@ -450,6 +450,12 @@ Node *reduce_node(Node *node);
 int64_t get_by_integer(Node *node);
 
 //
+// unicode.c
+//
+
+int encode_utf8(char *buf, uint32_t c);
+
+//
 // codegen.c
 //
 
