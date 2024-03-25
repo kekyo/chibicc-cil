@@ -183,6 +183,10 @@ static void gen_addr(Node *node) {
     switch (node->var->kind) {
       case OB_GLOBAL:
         // Global variable
+        // ***MOVESFLD***: ldsflda is not used here. because even if it is a static field,
+        //   the CLR sometimes moved its physical memory address at runtime, damn it!
+        //   To deal with this problem, we use calloc in the type initializer
+        //   to store true fixed addresses.
         println("  ldsfld %s", node->var->name);
         return;
       case OB_LOCAL:
@@ -684,6 +688,27 @@ static void gen_expr(Node *node, bool will_discard) {
     return;
   case ND_VAR:
     if (!will_discard) {
+      // Load directly from local variable and the parameters
+      // when it isn't an array, struct or union.
+      switch (node->var->ty->kind) {
+        case TY_ARRAY:
+        case TY_STRUCT:
+        case TY_UNION:
+          break;
+        default:
+          switch (node->var->kind) {
+            // Local variable
+            case OB_LOCAL:
+              println("  ldloc %d", node->var->offset);
+              return;
+            // Parameter variable
+            case OB_PARAM:
+              println("  ldarg %d", node->var->offset);
+              return;
+          }
+          break;
+      }
+      // Load with indirect.
       gen_addr(node);
       load(node->ty);
     }
@@ -727,9 +752,9 @@ static void gen_expr(Node *node, bool will_discard) {
       gen_sizeof(node->sizeof_ty);
     return;
   case ND_ASSIGN:
-    gen_addr(node->lhs);
-
     if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      gen_addr(node->lhs);
+
       // If the lhs is a bitfield, we need to read the current value
       // from memory and merge it with a new value.
       Member *mem = node->lhs->member;
@@ -763,14 +788,46 @@ static void gen_expr(Node *node, bool will_discard) {
         println("  ldloc %s", temp_name);
         cast(ty_long, node->ty);
       }
-    } else {
-      if (!will_discard)
-        println("  dup");
-      gen_expr(node->rhs, false);
-      store(node->ty);
-      if (!will_discard)
-        load(node->ty);
+      return;
     }
+
+    // Store directly to local variable and the parameters
+    // when it isn't an array, struct or union.
+    if (node->lhs->kind == ND_VAR) {
+      switch (node->lhs->var->ty->kind) {
+        case TY_ARRAY:
+        case TY_STRUCT:
+        case TY_UNION:
+          break;
+        default:
+          switch (node->lhs->var->kind) {
+            // Local variable
+            case OB_LOCAL:
+              gen_expr(node->rhs, false);
+              println("  stloc %d", node->lhs->var->offset);
+              if (!will_discard)
+                println("  ldloc %d", node->lhs->var->offset);
+              return;
+            // Parameter variable
+            case OB_PARAM:
+              gen_expr(node->rhs, false);
+              println("  starg %d", node->lhs->var->offset);
+              if (!will_discard)
+                println("  ldarg %d", node->lhs->var->offset);
+              return;
+          }
+          break;
+      }
+    }
+
+    // Store with indirect.
+    gen_addr(node->lhs);
+    if (!will_discard)
+      println("  dup");
+    gen_expr(node->rhs, false);
+    store(node->ty);
+    if (!will_discard)
+      load(node->ty);
     return;
   case ND_STMT_EXPR: {
     bool dead = false;
@@ -1303,7 +1360,7 @@ static void emit_data_alloc(Obj *var, bool is_static) {
   } else
     gen_sizeof(var->ty);
 
-  println("  call calloc");
+  println("  call calloc");    // ***MOVESFLD***
   println("  stsfld %s", var->name);
 }
 
