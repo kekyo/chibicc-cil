@@ -907,7 +907,7 @@ static int array_designator(Token **rest, Token *tok, Type *ty) {
   return i;
 }
 
-// designation = ("[" const-expr "]")* "=" initializer
+// designation = ("[" const-expr "]")* "="? initializer
 static void designation(Token **rest, Token *tok, Initializer *init) {
   if (equal(tok, "[")) {
     if (init->ty->kind != TY_ARRAY)
@@ -918,7 +918,8 @@ static void designation(Token **rest, Token *tok, Initializer *init) {
     return;
   }
 
-  tok = skip(tok, "=");
+  if (equal(tok, "="))
+    tok = tok->next;
   initializer2(rest, tok, init);
 }
 
