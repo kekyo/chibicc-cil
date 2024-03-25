@@ -646,15 +646,19 @@ static void gen_const_integer(Type *ty, long val) {
   unreachable();
 }
 
-// If will_discard is true, the result must be discarded.
-static void gen_expr(Node *node, bool will_discard) {
-  if (node->tok)
+static void gen_location(Node *node) {
+  if (node->tok && node->tok->line_no)
     println("  .location %d %d %d %d %d",
       node->tok->file->file_no,
       node->tok->line_no - 1,
       node->tok->column_no - 1,
       node->tok->line_no - 1,
       node->tok->column_no + node->tok->len - 1);
+}
+
+// If will_discard is true, the result must be discarded.
+static void gen_expr(Node *node, bool will_discard) {
+  gen_location(node);
 
   switch (node->kind) {
   case ND_NULL_EXPR:
@@ -1060,13 +1064,7 @@ static void gen_dummy_value(Type *ty) {
 
 // When true is returned, the execution flow continues.
 static bool gen_stmt(Node *node) {
-  if (node->tok)
-    println("  .location %d %d %d %d %d",
-      node->tok->file->file_no,
-      node->tok->line_no - 1,
-      node->tok->column_no - 1,
-      node->tok->line_no - 1,
-      node->tok->column_no + node->tok->len - 1);
+  gen_location(node);
 
   switch (node->kind) {
   case ND_IF: {

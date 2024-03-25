@@ -951,16 +951,60 @@ void init_macros(void) {
   define_macro("__TIME__", format_time(tm));
 }
 
+typedef enum {
+  STR_NONE, STR_UTF8, STR_UTF16, STR_UTF32, STR_WIDE,
+} StringKind;
+
+static StringKind getStringKind(Token *tok) {
+  if (!strcmp(tok->loc, "u8"))
+    return STR_UTF8;
+
+  switch (tok->loc[0]) {
+  case '"': return STR_NONE;
+  case 'u': return STR_UTF16;
+  case 'U': return STR_UTF32;
+  case 'L': return STR_WIDE;
+  }
+  unreachable();
+}
+
 // Concatenate adjacent string literals into a single string literal
 // as per the C spec.
-static void join_adjacent_string_literals(Token *tok1) {
-  while (tok1->kind != TK_EOF) {
+static void join_adjacent_string_literals(Token *tok) {
+  // First pass: If regular string literals are adjacent to wide
+  // string literals, regular string literals are converted to a wide
+  // type before concatenation. In this pass, we do the conversion.
+  for (Token *tok1 = tok; tok1->kind != TK_EOF;) {
     if (tok1->kind != TK_STR || tok1->next->kind != TK_STR) {
       tok1 = tok1->next;
       continue;
     }
 
-    if (tok1->ty->base->size->kind != ND_NUM || tok1->next->ty->base->size->kind != ND_NUM) {
+    StringKind kind = getStringKind(tok1);
+    Type *basety = tok1->ty->base;
+
+    for (Token *t = tok1->next; t->kind == TK_STR; t = t->next) {
+      StringKind k = getStringKind(t);
+      if (kind == STR_NONE) {
+        kind = k;
+        basety = t->ty->base;
+      } else if (k != STR_NONE && kind != k) {
+        error_tok(t, "unsupported non-standard concatenation of string literals");
+      }
+    }
+
+    if (basety->kind == TY_SHORT || basety->kind == TY_INT)
+      for (Token *t = tok1; t->kind == TK_STR; t = t->next)
+        if (t->ty->base->kind == TY_CHAR)
+          *t = *tokenize_string_literal(t, basety);
+
+    while (tok1->kind == TK_STR)
+      tok1 = tok1->next;
+  }
+
+  // Second pass: concatenate adjacent string literals.
+  for (Token *tok1 = tok; tok1->kind != TK_EOF;) {
+    if (tok1->kind != TK_STR || tok1->next->kind != TK_STR) {
       tok1 = tok1->next;
       continue;
     }
@@ -975,8 +1019,13 @@ static void join_adjacent_string_literals(Token *tok1) {
 
     char *buf = calloc(get_by_integer(tok1->ty->base->size), len);
 
-    for (Token *t = tok1; t != tok2; t = t->next)
-      strncat(buf, t->str, t->ty->array_len * get_by_integer(t->ty->base->size));
+    int i = 0;
+    for (Token *t = tok1; t != tok2; t = t->next) {
+      int len = t->ty->array_len;
+      int size = get_by_integer(t->ty->base->size);
+      memcpy(buf + i, t->str, len * size);
+      i = i + (len - 1) * size;
+    }
 
     *tok1 = *copy_token(tok1);
     tok1->ty = array_of(tok1->ty->base, len, tok1);
