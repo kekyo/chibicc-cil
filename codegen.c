@@ -160,14 +160,6 @@ static char *gen_make_temp(Type *ty) {
   return name;
 }
 
-// Made native pointer when managed pointer store into it.
-static void gen_make_ptr() {
-  println("  .local void* __ptr%d$", lvar_offset);
-  println("  stloc __ptr%d$", lvar_offset);
-  println("  ldloc __ptr%d$", lvar_offset);
-  lvar_offset++;
-}
-
 // Compute the absolute address of a given node.
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
@@ -220,6 +212,7 @@ static void gen_addr(Node *node) {
     return;
   case ND_FUNCALL:
     gen_expr(node, false);
+    // Will make address from lvar stored retval.
     println("  .local %s __retval%d$", to_cil_typename(node->ty), lvar_offset);
     println("  stloc __retval%d$", lvar_offset);
     println("  ldloca __retval%d$", lvar_offset);
@@ -228,6 +221,14 @@ static void gen_addr(Node *node) {
   }
 
   error_tok(node->tok, "not an lvalue");
+}
+
+// Made native pointer when managed pointer store into it.
+static void gen_make_ptr(Type *ty) {
+  println("  .local %s* __ptr%d$", to_cil_typename(ty), lvar_offset);
+  println("  stloc __ptr%d$", lvar_offset);
+  println("  ldloc __ptr%d$", lvar_offset);
+  lvar_offset++;
 }
 
 // Load a value from where stack top is pointing to.
@@ -240,7 +241,7 @@ static void load(Type *ty) {
       // becomes not the array itself but the address of the array.
       // This is where "array is automatically converted to a pointer to
       // the first element of the array in C" occurs.
-      gen_make_ptr();
+      gen_make_ptr(ty->base);
       return;
     case TY_FUNC:
       return;

@@ -194,6 +194,7 @@ static int get_type_comparer(Type *ty) {
     return 4;
   case TY_NINT:
   case TY_PTR:
+  case TY_FUNC:
     return 5;
   }
   unreachable();

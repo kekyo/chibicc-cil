@@ -321,7 +321,7 @@ static Obj *new_string_literal(char *p, Type *ty) {
   Obj *var = new_anon_gvar(ty, p);
   var->init_data = p;
   if (ty->kind == TY_ARRAY)
-    var->init_data_size = ty->array_len;
+    var->init_data_size = ty->array_len * calculate_size(ty->base);
   else
     unreachable();
   return var;

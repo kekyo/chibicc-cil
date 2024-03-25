@@ -438,6 +438,7 @@ void add_type(Node *node);
 // utils.c
 //
 
+int calculate_size(Type *ty);
 Node *align_to_node(Node *n, Node *align);
 char *to_cil_typename(Type *ty);
 void pretty_print_node(Node *node);

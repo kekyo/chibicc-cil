@@ -1,6 +1,6 @@
 #include "chibicc.h"
 
-static int calculate_size(Type *ty) {
+int calculate_size(Type *ty) {
   if (ty->size && ty->size->kind == ND_NUM)
     return ty->size->val;
   switch (ty->kind) {
