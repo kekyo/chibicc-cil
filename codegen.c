@@ -1370,6 +1370,14 @@ static void emit_data_alloc(Obj *var, bool is_static) {
   if (var->is_static != is_static)
     return;
 
+  // C.data.ptr ??= calloc(1, size);
+  int c = count();
+  println("  ldsfld %s", var->name);
+  println("  ldc.i4.0");
+  println("  conv.u");
+  println("  ceq");
+  println("  brfalse.s _L_alloc_%d", c);
+
   println("  ldc.i4.1");
   println("  conv.u");
 
@@ -1381,6 +1389,8 @@ static void emit_data_alloc(Obj *var, bool is_static) {
 
   println("  call calloc");    // ***MOVESFLD***
   println("  stsfld %s", var->name);
+
+  println("_L_alloc_%d:", c);
 }
 
 static void emit_data_init(Obj *var, bool is_static) {
