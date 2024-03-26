@@ -188,6 +188,11 @@ struct Obj {
   Obj *params;
   Node *body;
   Obj *locals;
+
+  // Static inline function
+  bool is_live;
+  bool is_root;
+  StringArray refs;
 };
 
 // AST node
