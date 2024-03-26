@@ -246,49 +246,50 @@ bool equals_type(Type *lhs, Type *rhs) {
   if (lhs == NULL || rhs == NULL)
     // Be not added types on add_type().
     unreachable();
+
   if (lhs == rhs)
     return true;
+
+  if (lhs->origin)
+    return equals_type(lhs->origin, rhs);
+
+  if (rhs->origin)
+    return equals_type(lhs, rhs->origin);
+
   if (lhs->kind != rhs->kind)
-    return false;
-  if (lhs->is_unsigned != rhs->is_unsigned)
     return false;
 
   switch (lhs->kind) {
-    case TY_PTR:
-      return equals_type(lhs->base, rhs->base);
-    case TY_ARRAY:
-      return equals_type(lhs->base, rhs->base) && lhs->array_len == rhs->array_len;
-    case TY_VOID:
-    case TY_BOOL:
     case TY_CHAR:
     case TY_SHORT:
     case TY_INT:
     case TY_LONG:
     case TY_NINT:
+      return lhs->is_unsigned == rhs->is_unsigned;
     case TY_FLOAT:
     case TY_DOUBLE:
-    case TY_VA_LIST:
       return true;
-    case TY_ENUM:
-    case TY_STRUCT:
-    case TY_UNION:
-      return false;
-    case TY_FUNC:
-      if (equals_type(lhs->return_ty, rhs->return_ty)) {
-        Type *lt = lhs->params;
-        Type *rt = lhs->params;
-        while (lt != NULL && rt != NULL) {
-          if (!equals_type(lt, rt))
-            return false;
-          lt = lt->next;
-          rt = rt->next;
-        }
-        return lt == NULL && rt == NULL;
-      }
-      return false;
-    default:
-      unreachable();
+    case TY_PTR:
+      return equals_type(lhs->base, rhs->base);
+    case TY_FUNC: {
+      if (!equals_type(lhs->return_ty, rhs->return_ty))
+        return false;
+      if (lhs->is_variadic != rhs->is_variadic)
+        return false;
+
+      Type *lt = lhs->params;
+      Type *rt = lhs->params;
+      for (; lt && rt; lt = lt->next, rt = rt->next)
+        if (!equals_type(lt, rt))
+          return false;
+      return lt == NULL && rt == NULL;
+    }
+    case TY_ARRAY:
+      if (!equals_type(lhs->base, rhs->base))
+        return false;
+      return lhs->array_len == rhs->array_len;
   }
+  return false;
 }
 
 bool equals_node(Node *lhs, Node *rhs) {

@@ -2707,6 +2707,7 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
 //         | "sizeof" unary
 //         | "_Alignof" "(" type-name ")"
 //         | "_Alignof" unary
+//         | "__builtin_types_compatible_p" "(" type-name, type-name, ")"
 //         | ident
 //         | str
 //         | num
@@ -2749,6 +2750,15 @@ static Node *primary(Token **rest, Token *tok) {
     Node *node = unary(rest, tok->next);
     add_type(node);
     return node->ty->align;
+  }
+
+  if (equal(tok, "__builtin_types_compatible_p")) {
+    tok = skip(tok->next, "(");
+    Type *t1 = typename(&tok, tok);
+    tok = skip(tok, ",");
+    Type *t2 = typename(&tok, tok);
+    *rest = skip(tok, ")");
+    return new_num(is_compatible(t1, t2), start);
   }
 
   if (tok->kind == TK_IDENT) {
