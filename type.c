@@ -196,7 +196,10 @@ Type *pointer_to(Type *base, Token *tok) {
 }
 
 Type *func_type(Type *return_ty, Token *tok) {
+  // The C spec disallows sizeof(<function type>), but
+  // GCC allows that and the expression is evaluated to 1.
   Type *ty = new_type(TY_FUNC);
+  ty->size = size1_node;
   ty->return_ty = return_ty;
   ty->tok = tok;
   return ty;
