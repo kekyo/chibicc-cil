@@ -184,6 +184,7 @@ struct Obj {
   Node *init_expr;
 
   // Function
+  bool is_inline;
   Obj *params;
   Node *body;
   Obj *locals;
