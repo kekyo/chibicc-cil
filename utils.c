@@ -213,7 +213,7 @@ static char *pretty_print(Node *node) {
     case ND_SWITCH:
       return format("switch %s %s", pretty_print(node->cond), pretty_print(node->then));
     case ND_CASE:
-      return format("case %s: %s", node->val, pretty_print(node->lhs));
+      return format("case %ld: %s", node->val, pretty_print(node->lhs));
     case ND_RETURN:
       if (node->lhs)
         return format("return %s", pretty_print(node->lhs));

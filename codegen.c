@@ -22,6 +22,7 @@ typedef enum {
 static void gen_expr(Node *node, bool will_discard);
 static AfterStmt gen_stmt(Node *node);
 
+__attribute__((format(printf, 1, 2)))
 static void println(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -1423,7 +1424,7 @@ static void emit_data(Obj *prog) {
       for (int i = 0; i < var->init_data_size; i++)
         print(" 0x%hhx", var->init_data[i]);
 
-      println("");
+      println("  ");
     }
 
     if (var->is_static)
