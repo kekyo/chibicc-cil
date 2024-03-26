@@ -13,8 +13,14 @@ struct UsingType
 static UsingType *using_type = NULL;
 static int lvar_offset = -1;
 
+typedef enum {
+  AS_NOTHING,
+  AS_JUMP_ANOTHER,
+  AS_CONTINUE,
+} AfterStmt;
+
 static void gen_expr(Node *node, bool will_discard);
-static bool gen_stmt(Node *node);
+static AfterStmt gen_stmt(Node *node);
 
 static void println(char *fmt, ...) {
   va_list ap;
@@ -847,14 +853,14 @@ static void gen_expr(Node *node, bool will_discard) {
     for (Node *n = node->body; n; n = n->next) {
       if (!dead) {
         if (n->next) {
-          if (!gen_stmt(n))
+          if (gen_stmt(n) != AS_CONTINUE)
             dead = true;
         } else
           gen_expr(n->lhs, will_discard);
       } else if (n->kind == ND_LABEL && n->is_resolved_label) {
         dead = false;
         if (n->next) {
-          if (!gen_stmt(n))
+          if (gen_stmt(n) != AS_CONTINUE)
             dead = true;
         } else
           gen_expr(n->lhs, will_discard);
@@ -1063,7 +1069,7 @@ static void gen_dummy_value(Type *ty) {
 }
 
 // When true is returned, the execution flow continues.
-static bool gen_stmt(Node *node) {
+static AfterStmt gen_stmt(Node *node) {
   gen_location(node);
 
   switch (node->kind) {
@@ -1072,18 +1078,18 @@ static bool gen_stmt(Node *node) {
     gen_expr(node->cond, false);
     cmp_zero(node->cond->ty);
     println("  brtrue _L_else_%d", c);
-    if (gen_stmt(node->then))
+    if (gen_stmt(node->then) == AS_CONTINUE)
       println("  br _L_end_%d", c);
     println("_L_else_%d:", c);
     if (node->els)
       gen_stmt(node->els);
     println("_L_end_%d:", c);
-    return true;
+    return AS_CONTINUE;
   }
   case ND_FOR: {
     int c = count();
     if (node->init) {
-      if (!gen_stmt(node->init))
+      if (gen_stmt(node->init) != AS_CONTINUE)
         unreachable();
     }
     println("_L_begin_%d:", c);
@@ -1092,28 +1098,28 @@ static bool gen_stmt(Node *node) {
       cmp_zero(node->cond->ty);
       println("  brtrue %s", node->brk_label);
     }
-    bool req = gen_stmt(node->then);
-    if (req || node->is_resolved_cont) {
+    AfterStmt req = gen_stmt(node->then);
+    if ((req == AS_CONTINUE) || node->is_resolved_cont) {
       println("%s:", node->cont_label);
       if (node->inc)
         gen_expr(node->inc, true);
       println("  br _L_begin_%d", c);
     }
     println("%s:", node->brk_label);
-    return true;
+    return AS_CONTINUE;
   }
   case ND_DO: {
     int c = count();
     println("_L_begin_%d:", c);
-    bool req = gen_stmt(node->then);
-    if (req || node->is_resolved_cont) {
+    AfterStmt req = gen_stmt(node->then);
+    if ((req == AS_CONTINUE) || node->is_resolved_cont) {
       println("%s:", node->cont_label);
       gen_expr(node->cond, false);
     cmp_zero(node->cond->ty);
     println("  brfalse _L_begin_%d", c);
     }
     println("%s:", node->brk_label);
-    return true;
+    return AS_CONTINUE;
   }
   case ND_SWITCH:
     gen_expr(node->cond, true);
@@ -1140,29 +1146,31 @@ static bool gen_stmt(Node *node) {
       println("  br %s", node->brk_label);
     gen_stmt(node->then);
     println("%s:", node->brk_label);
-    return true;
+    return AS_CONTINUE;
   case ND_CASE:
     println("%s:", node->label);
     return gen_stmt(node->lhs);
   case ND_BLOCK: {
     Node *n = node->body;
-    bool dead = false;
+    AfterStmt res = AS_CONTINUE;
     while (n) {
-      if (!dead) {
-        if (!gen_stmt(n))
-          dead = true;
+      if (res == AS_CONTINUE) {
+        AfterStmt req = gen_stmt(n);
+        if (req != AS_CONTINUE)
+          res = req;
       } else if (n->kind == ND_CASE || (n->kind == ND_LABEL && n->is_resolved_label)) {
-        dead = false;
-        if (!gen_stmt(n))
-          dead = true;
+        res = AS_CONTINUE;
+        AfterStmt req = gen_stmt(n);
+        if (req != AS_CONTINUE)
+          res = req;
       }
       n = n->next;
     }
-    return !dead;
+    return res;
   }
   case ND_GOTO:
     println("  br %s", node->unique_label);
-    return false;
+    return AS_JUMP_ANOTHER;
   case ND_LABEL:
     println("%s:", node->unique_label);
     return gen_stmt(node->lhs);
@@ -1178,10 +1186,13 @@ static bool gen_stmt(Node *node) {
         gen_dummy_value(current_fn->ty->return_ty);
     }
     println("  br _L_return");
-    return false;
+    return AS_JUMP_ANOTHER;
   case ND_EXPR_STMT:
     gen_expr(node->lhs, true);
-    return true;
+    return AS_CONTINUE;
+  case ND_ASM:
+    println("  %s", node->asm_str);
+    return AS_NOTHING;
   }
 
   error_tok(node->tok, "invalid statement");
@@ -1499,16 +1510,18 @@ static void emit_text(Obj *prog) {
     }
 
     // Emit code
-    bool req = gen_stmt(fn->body);
-    if (req) {
+    AfterStmt req = gen_stmt(fn->body);
+    if (req == AS_CONTINUE) {
       if (fn->ty->return_ty->kind != TY_VOID)
         // Made valid CIL sequence.
         gen_dummy_value(fn->ty->return_ty);
     }
 
-    // Epilogue
-    println("_L_return:");
-    println("  ret");
+    if (req != AS_NOTHING) {
+      // Epilogue
+      println("_L_return:");
+      println("  ret");
+    }
   }
 }
 
