@@ -1,7 +1,7 @@
 #ifndef __TIME_H
 #define __TIME_H
 
-typedef long long time_t;
+typedef long time_t;
 
 struct tm {
   int tm_sec;
@@ -17,5 +17,7 @@ struct tm {
 
 time_t time(time_t *tloc);
 struct tm *localtime(const time_t *timer);
+
+char *ctime_r(const time_t *timep, char *buf);
 
 #endif
