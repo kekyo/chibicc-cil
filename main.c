@@ -171,6 +171,8 @@ static void parse_args(int argc, char **argv) {
         !strcmp(argv[i], "-fno-omit-frame-pointer") ||
         !strcmp(argv[i], "-fno-stack-protector") ||
         !strcmp(argv[i], "-fno-strict-aliasing") ||
+        !strcmp(argv[i], "-fcommon") ||
+        !strcmp(argv[i], "-fno-common") ||
         !strcmp(argv[i], "-m64") ||
         !strcmp(argv[i], "-mno-red-zone") ||
         !strcmp(argv[i], "-w"))
