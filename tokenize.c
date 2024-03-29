@@ -168,7 +168,7 @@ static bool is_keyword(Token *tok) {
     "__builtin_nint", "__builtin_nuint",
     "const", "volatile", "auto", "register", "restrict",
     "__restrict", "__restrict__", "_Noreturn", "float", "double",
-    "typeof", "asm",
+    "typeof", "asm", "_Thread_local", "__thread",
   };
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)

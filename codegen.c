@@ -186,7 +186,11 @@ static void gen_addr(Node *node) {
         //   the CLR sometimes moved its physical memory address at runtime, damn it!
         //   To deal with this problem, we use calloc in the type initializer
         //   to store true fixed addresses.
-        println("  ldsfld %s", node->var->name);
+        if (node->var->is_tls) {
+          println("  ldsfld __tls_%s__", node->var->name);
+          println("  call __get_tls_value");
+        } else
+          println("  ldsfld %s", node->var->name);
         return;
       case OB_LOCAL:
         // Local variable
@@ -1367,39 +1371,53 @@ static void emit_data_alloc(Obj *var, bool is_static) {
     emit_data_alloc(var->next, is_static);
   if (var->is_function || !var->is_definition)
     return;
-  if (var->is_static != is_static)
-    return;
 
-  // C.data.ptr ??= calloc(1, size);
+  // C.data.ptr ??= <allocator>();
   int c = count();
-  println("  ldsfld %s", var->name);
+  if (var->is_tls)
+    println("  ldsfld __tls_%s__", var->name);
+  else
+    println("  ldsfld %s", var->name);
   println("  ldc.i4.0");
   println("  conv.u");
   println("  ceq");
   println("  brfalse.s _L_alloc_%d", c);
 
-  println("  ldc.i4.1");
-  println("  conv.u");
-
-  if (var->ty->size->kind == ND_NUM) {
-    println("  ldc.i8 %ld", var->ty->size->val);
+  if (var->is_tls) {
+    // __alloc_tls_slot(size, __tls_init_$)
+    if (var->ty->size->kind == ND_NUM) {
+      println("  ldc.i8 %ld", var->ty->size->val);
+      println("  conv.u");
+    } else
+      gen_sizeof(var->ty);
+    println("  ldftn __tls_init_$%s", var->name);
+    println("  call __alloc_tls_slot");
+    println("  stsfld __tls_%s__", var->name);
+  } else {
+    // calloc(1, size)
+    println("  ldc.i4.1");
     println("  conv.u");
-  } else
-    gen_sizeof(var->ty);
-
-  println("  call calloc");    // ***MOVESFLD***
-  println("  stsfld %s", var->name);
+    if (var->ty->size->kind == ND_NUM) {
+      println("  ldc.i8 %ld", var->ty->size->val);
+      println("  conv.u");
+    } else
+      gen_sizeof(var->ty);
+    println("  call calloc");    // ***MOVESFLD***
+    println("  stsfld %s", var->name);
+  }
 
   println("_L_alloc_%d:", c);
 }
 
-static void emit_data_init(Obj *var, bool is_static) {
+static void emit_non_tls_data_init(Obj *var, bool is_static) {
   if (var->next)
     // Will make reversed order.
-    emit_data_init(var->next, is_static);
+    emit_non_tls_data_init(var->next, is_static);
   if (var->is_function || !var->is_definition)
     return;
   if (var->is_static != is_static)
+    return;
+  if (var->is_tls)
     return;
 
   const char *ty_name = to_cil_typename(var->ty);
@@ -1415,6 +1433,38 @@ static void emit_data_init(Obj *var, bool is_static) {
     lvar_offset = 0;
     gen_expr(var->init_expr, true);
   }
+}
+
+static void emit_tls_data_init(Obj *var) {
+  if (var->next)
+    // Will make reversed order.
+    emit_tls_data_init(var->next);
+  if (var->is_function || !var->is_definition)
+    return;
+  if (!var->is_tls)
+    return;
+
+  const char *ty_name = to_cil_typename(var->ty);
+
+  if (var->is_static)
+    println(".function file void() __tls_init_$%s", var->name);
+  else
+    println(".function internal void() __tls_init_$%s", var->name);
+
+  if (var->init_data) {
+    println("  ldsfld __tls_%s__", var->name);
+    println("  call __get_tls_value");
+    println("  ldsflda _const_$%s", var->name);
+    println("  ldobj %s", ty_name);
+    println("  stobj %s", ty_name);
+  }
+
+  if (var->init_expr) {
+    lvar_offset = 0;
+    gen_expr(var->init_expr, true);
+  }
+
+  println("  ret");
 }
 
 static void emit_data(Obj *prog) {
@@ -1437,22 +1487,32 @@ static void emit_data(Obj *prog) {
       println("  ");
     }
 
-    if (var->is_static)
-      println(".global file %s* %s", ty_name, var->name);
-    else
-      println(".global public %s* %s", ty_name, var->name);
+    if (var->is_tls) {
+      if (var->is_static)
+        println(".global file __tls_slot* __tls_%s__", var->name);
+      else
+        println(".global public __tls_slot* __tls_%s__", var->name);
+    } else {
+      if (var->is_static)
+        println(".global file %s* %s", ty_name, var->name);
+      else
+        println(".global public %s* %s", ty_name, var->name);
+
+    }
   }
 
   if (prog) {
     println(".initializer file");
     emit_data_alloc(prog, true);
-    emit_data_init(prog, true);
+    emit_non_tls_data_init(prog, true);
     println("  ret");
 
     println(".initializer internal");
     emit_data_alloc(prog, false);
-    emit_data_init(prog, false);
+    emit_non_tls_data_init(prog, false);
     println("  ret");
+
+    emit_tls_data_init(prog);
   }
 }
 

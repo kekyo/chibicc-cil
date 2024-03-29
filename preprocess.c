@@ -982,7 +982,6 @@ void init_macros(void) {
     case M64:
       define_macro("_LP64", "1");
       define_macro("__LP64__", "1");
-      define_macro("__SIZEOF_LONG__", "8");
       define_macro("__SIZEOF_POINTER__", "8");
       define_macro("__SIZEOF_PTRDIFF_T__", "8");
       define_macro("__SIZEOF_SIZE_T__", "8");
@@ -991,20 +990,19 @@ void init_macros(void) {
     case M32:
       define_macro("_ILP32", "1");
       define_macro("__ILP32__", "1");
-      define_macro("__SIZEOF_LONG__", "4");
       define_macro("__SIZEOF_POINTER__", "4");
       define_macro("__SIZEOF_PTRDIFF_T__", "4");
       define_macro("__SIZEOF_SIZE_T__", "4");
       define_macro("__SIZE_TYPE__", "unsigned");
       break;
     default:
-      define_macro("__SIZEOF_LONG__", "(sizeof(long))");
       define_macro("__SIZEOF_POINTER__", "(sizeof(void *))");
       define_macro("__SIZEOF_PTRDIFF_T__", "(sizeof(void *))");
       define_macro("__SIZEOF_SIZE_T__", "(sizeof(__builtin_nuint))");
       define_macro("__SIZE_TYPE__", "__builtin_nuint");
       break;
   }
+  define_macro("__SIZEOF_LONG__", "8");
   define_macro("__SIZEOF_DOUBLE__", "8");
   define_macro("__SIZEOF_FLOAT__", "4");
   define_macro("__SIZEOF_INT__", "4");
@@ -1016,7 +1014,6 @@ void init_macros(void) {
   define_macro("__STDC_HOSTED__", "1");
   define_macro("__STDC_NO_ATOMICS__", "1");
   define_macro("__STDC_NO_COMPLEX__", "1");
-  define_macro("__STDC_NO_THREADS__", "1");
   define_macro("__STDC_NO_VLA__", "1");
   define_macro("__STDC_UTF_16__", "1");
   define_macro("__STDC_UTF_32__", "1");

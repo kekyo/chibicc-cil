@@ -183,6 +183,7 @@ struct Obj {
   bool is_static;
 
   // Global variable
+  bool is_tls;
   char *init_data;
   int init_data_size;
   Node *init_expr;

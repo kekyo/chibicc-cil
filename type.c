@@ -363,6 +363,7 @@ void add_type(Node *node) {
     return;
   case ND_VAR:
     node->ty = node->var->ty;
+    add_type(node->var->init_expr);
     return;
   case ND_COND:
     if (node->then->ty->kind == TY_VOID || node->els->ty->kind == TY_VOID)

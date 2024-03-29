@@ -1083,15 +1083,9 @@ static Node *reduce_(Node *node) {
       return node;
   }
   case ND_VAR: {
-    // Reduce initializer expression assigner.
-    if (node->var->init_expr && !node->var->init_expr->is_reduced && node->var->init_expr->kind == ND_ASSIGN) {
-      rhs = reduce(node->var->init_expr->rhs);
-      Node *nnode = new_node(ND_ASSIGN, node->var->init_expr->tok);
-      nnode->lhs = node->var->init_expr->lhs;
-      nnode->rhs = rhs;
-      nnode->ty = node->var->init_expr->ty;
-      node->var->init_expr = nnode;
-    }
+    // W: Updated init_expr.
+    if (node->var->init_expr)
+      node->var->init_expr = reduce(node->var->init_expr);
     return node;
   }
   case ND_NUM:
