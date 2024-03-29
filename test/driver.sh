@@ -170,4 +170,11 @@ check -idirafter
 echo "#include \"idirafter\"" | $chibicc -idirafter $tmp/dir1 -I$tmp/dir2 -E - | grep -q bar
 check -idirafter
 
+# -include
+echo foo > $tmp/out.h
+echo bar | $chibicc -include $tmp/out.h -E -o- - | grep -q -z 'foo.*bar'
+check -include
+echo NULL | $chibicc -Iinclude -include stdio.h -E -o- - | grep -q 0
+check -include
+
 echo OK
