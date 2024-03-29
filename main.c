@@ -1,9 +1,12 @@
 #include "chibicc.h"
 
+typedef enum { FILE_NONE, FILE_C, FILE_ASM, FILE_OBJ } FileType;
+
 static MemoryModel opt_mm = AnyCPU;
 
 StringArray include_paths;
 
+static FileType opt_x;
 static StringArray opt_include;
 static bool opt_E;
 static bool opt_S;
@@ -26,7 +29,7 @@ static void usage(int status) {
 }
 
 static bool take_arg(char *arg) {
-  char *x[] = {"-o", "-I", "-idirafter", "-include"};
+  char *x[] = {"-o", "-I", "-idirafter", "-include", "-x"};
 
   for (int i = 0; i < sizeof(x) / sizeof(*x); i++)
     if (!strcmp(arg, x[i]))
@@ -51,6 +54,16 @@ static void define(char *str) {
     define_macro(strndup(str, eq - str), eq + 1);
   else
     define_macro(str, "1");
+}
+
+static FileType parse_opt_x(char *s) {
+  if (!strcmp(s, "c"))
+    return FILE_C;
+  if (!strcmp(s, "assembler"))
+    return FILE_ASM;
+  if (!strcmp(s, "none"))
+    return FILE_NONE;
+  error("<command line>: unknown argument for -x: %s", s);
 }
 
 static void parse_args(int argc, char **argv) {
@@ -152,6 +165,16 @@ static void parse_args(int argc, char **argv) {
       continue;
     }
 
+    if (!strcmp(argv[i], "-x")) {
+      opt_x = parse_opt_x(argv[++i]);
+      continue;
+    }
+
+    if (!strncmp(argv[i], "-x", 2)) {
+      opt_x = parse_opt_x(argv[i] + 2);
+      continue;
+    }
+
     if (!strcmp(argv[i], "-cc1-input")) {
       base_file = argv[++i];
       continue;
@@ -249,13 +272,14 @@ static void run_subprocess(char **argv) {
   }
 
   // Child process. Run a new command.
-  // Wait for the child process to finish.
   pid_t pid;
   int status = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
   if (status == -1) {
     fprintf(stderr, "spawn failed: %s: %s\n", argv[0], strerror(errno));
     exit(1);
   }
+
+  // Wait for the child process to finish.
   do {
     if (waitpid(pid, &status, 0) == -1) {
       fprintf(stderr, "waitpid failed: %s: %s\n", argv[0], strerror(errno));
@@ -369,7 +393,9 @@ static void cc1(void) {
 
 static void assemble(char *input, char *output) {
   char *cmd[] = {
-    "cp", input, output, NULL };
+    //"/home/kouji/Projects/chibicc-cil-toolchain/chibias/chibias/bin/Debug/net6.0/cil-chibias",
+    "cil-chibias",
+    "-c", input, "-o", output, NULL };
   run_subprocess(cmd);
 }
 
@@ -433,8 +459,8 @@ static void run_linker(StringArray *inputs, char *output) {
 
   char *apphostpath = find_apphostpath();
 
-  //strarray_push(&arr, "/home/kouji/Projects/chibias-cil/chibias/bin/Debug/net6.0/chibias");
-  strarray_push(&arr, "chibias");
+  //strarray_push(&arr, "/home/kouji/Projects/chibicc-cil-toolchain/chibild/chibild/bin/Debug/net6.0/cil-chibild");
+  strarray_push(&arr, "cil-chibild");
   strarray_push(&arr, "-o");
   strarray_push(&arr, output);
   strarray_push(&arr, "-f");
@@ -459,6 +485,21 @@ static void run_linker(StringArray *inputs, char *output) {
   strarray_push(&arr, NULL);
 
   run_subprocess(arr.data);
+}
+
+static FileType get_file_type(char *filename) {
+  if (endswith(filename, ".o"))
+    return FILE_OBJ;
+
+  if (opt_x != FILE_NONE)
+    return opt_x;
+
+  if (endswith(filename, ".c"))
+    return FILE_C;
+  if (endswith(filename, ".s"))
+    return FILE_ASM;
+
+  error("<command line>: unknown file extension: %s", filename);
 }
 
 int main(int argc, char **argv) {
@@ -488,22 +529,22 @@ int main(int argc, char **argv) {
     else
       output = replace_extn(input, ".o");
 
+    FileType type = get_file_type(input);
+
     // Handle .o
-    if (endswith(input, ".o")) {
+    if (type == FILE_OBJ) {
       strarray_push(&ld_args, input);
       continue;
     }
 
     // Handle .s
-    if (endswith(input, ".s")) {
+    if (type == FILE_ASM) {
       if (!opt_S)
         assemble(input, output);
       continue;
     }
 
-    // Handle .c
-    if (!endswith(input, ".c") && strcmp(input, "-"))
-      error("unknown file extension: %s", input);
+    assert(type == FILE_C);
 
     // Just preprocess
     if (opt_E) {

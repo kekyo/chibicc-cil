@@ -28,7 +28,7 @@ test/libc-bootstrap.dll: $(LIBC)
 	cp $(LIBC) -t test
 
 test/common.o: test/common test/test.h chibicc
-	./chibicc -Iinclude -Itest -c -o $@ - < test/common
+	./chibicc -Iinclude -Itest -c -o $@ -xc test/common
 
 test/%: test/%.c chibicc test/common.o test/libc-bootstrap.dll
 	./chibicc -Iinclude -Itest -c -o test/$*.o test/$*.c
@@ -67,7 +67,7 @@ stage2/test/libc-bootstrap.dll: $(LIBC)
 
 stage2/test/common.o: test/common test/test.h stage2/chibicc
 	mkdir -p stage2/test
-	./stage2/chibicc -Iinclude -Itest -c -o $@ - < test/common
+	./stage2/chibicc -Iinclude -Itest -c -o $@ -xc test/common
 
 stage2/test/%: test/%.c stage2/chibicc
 	./stage2/chibicc -Iinclude -Itest -c -o stage2/test/$*.o test/$*.c
@@ -104,7 +104,7 @@ stage3/test/libc-bootstrap.dll: $(LIBC)
 
 stage3/test/common.o: test/common test/test.h stage3/chibicc
 	mkdir -p stage3/test
-	./stage3/chibicc -Iinclude -Itest -c -o $@ - < test/common
+	./stage3/chibicc -Iinclude -Itest -c -o $@ -xc test/common
 
 stage3/test/%: test/%.c stage3/chibicc
 	./stage3/chibicc -Iinclude -Itest -c -o stage3/test/$*.o test/$*.c
