@@ -2990,6 +2990,8 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   // .NET: Splitted between parameters and local variables.
   locals = NULL;
 
+  tok = skip(tok, "{");
+
   // [https://www.sigbus.info/n1570#6.4.2.2p1] "__func__" is
   // automatically defined as a local variable containing the
   // current function name.
@@ -2999,8 +3001,6 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   // [GNU] __FUNCTION__ is yet another name of __func__.
   push_scope("__FUNCTION__")->var =
     new_string_literal(fn->name, array_of(ty_char, strlen(fn->name) + 1, tok));
-
-  tok = skip(tok, "{");
 
   fn->body = compound_stmt(&tok, tok);
   fn->locals = locals;

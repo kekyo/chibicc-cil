@@ -19,8 +19,8 @@ typedef enum {
   AS_CONTINUE,
 } AfterStmt;
 
-static void gen_expr(Node *node, bool will_discard);
-static AfterStmt gen_stmt(Node *node);
+static void gen_expr(Node *node, bool is_bottom, bool will_discard);
+static AfterStmt gen_stmt(Node *node, bool is_bottom);
 
 __attribute__((format(printf, 1, 2)))
 static void println(char *fmt, ...) {
@@ -169,7 +169,7 @@ static char *gen_make_temp(Type *ty) {
 
 // Compute the absolute address of a given node.
 // It's an error if a given node does not reside in memory.
-static void gen_addr(Node *node) {
+static void gen_addr(Node *node, bool is_bottom) {
   switch (node->kind) {
   case ND_VAR:
   case ND_SWITCH:
@@ -204,25 +204,25 @@ static void gen_addr(Node *node) {
     unreachable();
     return;
   case ND_DEREF:
-    gen_expr(node->lhs, false);
+    gen_expr(node->lhs, is_bottom, false);
     return;
   case ND_COMMA:
-    gen_expr(node->lhs, true);
-    gen_addr(node->rhs);
+    gen_expr(node->lhs, is_bottom, true);
+    gen_addr(node->rhs, false);
     return;
   case ND_MEMBER:
-    gen_addr(node->lhs);
+    gen_addr(node->lhs, is_bottom);
     // Suppress of the calculation for offset 0 might be done by reducer,
     // but ND_MEMBER is lost when suppress by reducer.
     // As a result, if special consideration is needed for member access,
     // it will be inaccessible.
     if (node->member->offset->kind != ND_NUM || node->member->offset->val != 0) {
-      gen_expr(node->member->offset, false);
+      gen_expr(node->member->offset, false, false);
       println("  add");
     }
     return;
   case ND_FUNCALL:
-    gen_expr(node, false);
+    gen_expr(node, is_bottom, false);
     // Will make address from lvar stored retval.
     println("  .local %s __retval%d$", to_cil_typename(node->ty), lvar_offset);
     println("  stloc __retval%d$", lvar_offset);
@@ -436,12 +436,29 @@ static void cast(Type *from, Type *to) {
   }
 }
 
-static void gen_funcall(Node *node, bool will_discard) {
+// TODO: Enhancements for alloca() handling. [`is_bottom` flag]
+// We have to use alloca() only bottom of evaluation stack,
+// will crash when violates it.
+
+static void gen_funcall(Node *node, bool is_bottom, bool will_discard) {
   if (node->lhs->kind == ND_VAR) {
+    // Special case: alloca()
+    if (strcmp(node->lhs->var->name, "alloca") == 0) {
+      if (!node->args)
+        error_tok(node->lhs->tok, "invalid argument");
+      if (!is_bottom)
+        error_tok(node->lhs->tok, "could not use alloca() in this place by CLR spec., allocates outside any expressions");
+      if (!will_discard) {
+        gen_expr(node->args, is_bottom, false);
+        println("  localloc");
+      }
+      return;
+    }
+
     // Special case: __builtin_trap()
     if (strcmp(node->lhs->var->name, "__builtin_trap") == 0) {
       if (node->args)
-        error_tok(node->tok, "invalid argument");
+        error_tok(node->lhs->tok, "invalid argument");
       else
         println("  break");
       return;
@@ -450,9 +467,9 @@ static void gen_funcall(Node *node, bool will_discard) {
     // Special case: __builtin_va_start(&ap, arg)
     if (strcmp(node->lhs->var->name, "__builtin_va_start") == 0) {
       if (!node->args || !node->args->next)
-        error_tok(node->tok, "invalid argument");
+        error_tok(node->lhs->tok, "invalid argument");
       else {
-        gen_expr(node->args, false);
+        gen_expr(node->args, is_bottom, false);
         println("  ldarg.s %d", node->args->next->var->offset + 1);
         println("  call __va_start");
       }
@@ -464,17 +481,17 @@ static void gen_funcall(Node *node, bool will_discard) {
       // &ap
       Node *arg = node->args;
       if (!arg)
-        error_tok(node->tok, "invalid argument");
-      gen_expr(arg, false);
+        error_tok(node->lhs->tok, "invalid argument");
+      gen_expr(arg, is_bottom, false);
       if (!arg->next)
         error_tok(arg->tok, "invalid argument");
       // (int*)0
       Node *typename_expr = arg->next;
       if (typename_expr->kind != ND_CAST || typename_expr->ty->kind != TY_PTR)
-        error_tok(arg->tok, "invalid argument");
+        error_tok(typename_expr->tok, "invalid argument");
       // 0
       if (typename_expr->lhs->kind != ND_NUM || typename_expr->lhs->val != 0)
-        error_tok(arg->tok, "invalid argument");
+        error_tok(typename_expr->lhs->tok, "invalid argument");
 
       if (!will_discard)
         println("  call __va_arg");
@@ -487,10 +504,10 @@ static void gen_funcall(Node *node, bool will_discard) {
     // Special case: __builtin_va_copy(&dest, &src)
     if (strcmp(node->lhs->var->name, "__builtin_va_copy") == 0) {
       if (!node->args || !node->args->next)
-        error_tok(node->tok, "invalid argument");
+        error_tok(node->lhs->tok, "invalid argument");
       else {
-        gen_expr(node->args, false);
-        gen_expr(node->args->next, false);
+        gen_expr(node->args, is_bottom, false);
+        gen_expr(node->args->next, false, false);
         println("  call __va_copy");
       }
       return;
@@ -505,15 +522,17 @@ static void gen_funcall(Node *node, bool will_discard) {
     sentinel_count -= param_count;
 
     Node *arg2 = node->args;
-    for (int i = 0; arg2 && i < param_count; arg2 = arg2->next, i++)
-      gen_expr(arg2, false);
+    for (int i = 0; arg2 && i < param_count; arg2 = arg2->next, i++) {
+      gen_expr(arg2, is_bottom, false);
+      is_bottom = false;
+    }
 
     println("  ldc.i4 %d", sentinel_count);
     println("  call __va_arglist_new");
 
     for (; arg2; arg2 = arg2->next) {
       println("  dup");
-      gen_expr(arg2, false);
+      gen_expr(arg2, false, false);
       if (arg2->ty->kind == TY_PTR || arg2->ty->kind == TY_ARRAY)
         println("  box nint");
       else
@@ -521,15 +540,17 @@ static void gen_funcall(Node *node, bool will_discard) {
       println("  call __va_arglist_add");
     }
   } else {
-    for (Node *arg = node->args; arg; arg = arg->next)
-      gen_expr(arg, false);
+    for (Node *arg = node->args; arg; arg = arg->next) {
+      gen_expr(arg, is_bottom, false);
+      is_bottom = false;
+    }
   }
 
   // Direct call
   if (node->lhs->kind == ND_VAR && node->lhs->var->ty->kind == TY_FUNC) {
     println("  call %s", node->lhs->var->name);
   } else {
-    gen_expr(node->lhs, false);
+    gen_expr(node->lhs, is_bottom, false);
     println("  calli %s", get_cil_callsite(node));
   }
 
@@ -574,13 +595,13 @@ static void gen_funcall(Node *node, bool will_discard) {
   }
 }
 
-static void gen_sizeof(Type *ty) {
+static void gen_sizeof(Type *ty, bool is_bottom) {
   switch (ty->kind) {
     case TY_STRUCT:
       // Struct size with flexible array will be calculated invalid size by sizeof opcode.
       if (ty->is_flexible) {
         aggregate_type(ty);
-        gen_expr(ty->size, false);
+        gen_expr(ty->size, is_bottom, false);
         return;
       }
       break;
@@ -668,7 +689,7 @@ static void gen_location(Node *node) {
 }
 
 // If will_discard is true, the result must be discarded.
-static void gen_expr(Node *node, bool will_discard) {
+static void gen_expr(Node *node, bool is_bottom, bool will_discard) {
   gen_location(node);
 
   switch (node->kind) {
@@ -698,7 +719,7 @@ static void gen_expr(Node *node, bool will_discard) {
     }
     return;
   case ND_NEG:
-    gen_expr(node->lhs, will_discard);
+    gen_expr(node->lhs, is_bottom, will_discard);
     if (!will_discard)
       println("  neg");
     return;
@@ -727,20 +748,20 @@ static void gen_expr(Node *node, bool will_discard) {
           break;
       }
       // Load with indirect.
-      gen_addr(node);
+      gen_addr(node, is_bottom);
       load(node->ty);
     }
     return;
   case ND_MEMBER: {
     if (!will_discard) {
-      gen_addr(node);
+      gen_addr(node, is_bottom);
       
       Member *mem = node->member;
       if (mem->is_bitfield) {
         load(ty_long);
 
         gen_const_integer(ty_int, 64 - mem->bit_width);
-        gen_expr(mem->bit_offset, false);
+        gen_expr(mem->bit_offset, false, false);
         println("  sub");
         println("  shl");
 
@@ -757,21 +778,21 @@ static void gen_expr(Node *node, bool will_discard) {
     return;
   }
   case ND_DEREF:
-    gen_expr(node->lhs, will_discard);
+    gen_expr(node->lhs, is_bottom, will_discard);
     if (!will_discard)
       load(node->ty);
     return;
   case ND_ADDR:
     if (!will_discard)
-      gen_addr(node->lhs);
+      gen_addr(node->lhs, is_bottom);
     return;
   case ND_SIZEOF:
     if (!will_discard)
-      gen_sizeof(node->sizeof_ty);
+      gen_sizeof(node->sizeof_ty, is_bottom);
     return;
   case ND_ASSIGN:
     if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
-      gen_addr(node->lhs);
+      gen_addr(node->lhs, is_bottom);
 
       // If the lhs is a bitfield, we need to read the current value
       // from memory and merge it with a new value.
@@ -780,12 +801,12 @@ static void gen_expr(Node *node, bool will_discard) {
       load(ty_long);
 
       gen_const_integer(ty_long, (1L << mem->bit_width) - 1);
-      gen_expr(mem->bit_offset, false);
+      gen_expr(mem->bit_offset, false, false);
       println("  shl");
       println("  not");
       println("  and");
 
-      gen_expr(node->rhs, false);
+      gen_expr(node->rhs, false, false);
       println("  conv.i8");
 
       char *temp_name;
@@ -797,7 +818,7 @@ static void gen_expr(Node *node, bool will_discard) {
 
       gen_const_integer(ty_long, (1L << mem->bit_width) - 1);
       println("  and");
-      gen_expr(mem->bit_offset, false);
+      gen_expr(mem->bit_offset, false, false);
       println("  shl");
       println("  or");
 
@@ -821,7 +842,7 @@ static void gen_expr(Node *node, bool will_discard) {
           switch (node->lhs->var->kind) {
             // Local variable
             case OB_LOCAL:
-              gen_expr(node->rhs, false);
+              gen_expr(node->rhs, is_bottom, false);
               cast(node->rhs->ty, node->lhs->var->ty);
               println("  stloc %d", node->lhs->var->offset);
               if (!will_discard) {
@@ -831,7 +852,7 @@ static void gen_expr(Node *node, bool will_discard) {
               return;
             // Parameter variable
             case OB_PARAM:
-              gen_expr(node->rhs, false);
+              gen_expr(node->rhs, is_bottom, false);
               cast(node->rhs->ty, node->lhs->var->ty);
               println("  starg %d", node->lhs->var->offset);
               if (!will_discard) {
@@ -845,10 +866,10 @@ static void gen_expr(Node *node, bool will_discard) {
     }
 
     // Store with indirect.
-    gen_addr(node->lhs);
+    gen_addr(node->lhs, is_bottom);
     if (!will_discard)
       println("  dup");
-    gen_expr(node->rhs, false);
+    gen_expr(node->rhs, false, false);
     store(node->ty);
     if (!will_discard)
       load(node->ty);
@@ -858,63 +879,64 @@ static void gen_expr(Node *node, bool will_discard) {
     for (Node *n = node->body; n; n = n->next) {
       if (!dead) {
         if (n->next) {
-          if (gen_stmt(n) != AS_CONTINUE)
+          if (gen_stmt(n, is_bottom) != AS_CONTINUE)
             dead = true;
         } else
-          gen_expr(n->lhs, will_discard);
+          gen_expr(n->lhs, is_bottom, will_discard);
       } else if (n->kind == ND_LABEL && n->is_resolved_label) {
         dead = false;
         if (n->next) {
-          if (gen_stmt(n) != AS_CONTINUE)
+          if (gen_stmt(n, is_bottom) != AS_CONTINUE)
             dead = true;
         } else
-          gen_expr(n->lhs, will_discard);
+          gen_expr(n->lhs, is_bottom, will_discard);
       }
+      is_bottom = false;
     }
     return;
   }
   case ND_COMMA:
-    gen_expr(node->lhs, true);
-    gen_expr(node->rhs, will_discard);
+    gen_expr(node->lhs, is_bottom, true);
+    gen_expr(node->rhs, false, will_discard);
     return;
   case ND_CAST:
-    gen_expr(node->lhs, will_discard);
+    gen_expr(node->lhs, is_bottom, will_discard);
     if (!will_discard)
       cast(node->lhs->ty, node->ty);
     return;
   case ND_MEMZERO:
-    gen_addr(node);
+    gen_addr(node, is_bottom);
     println("  initobj %s", to_cil_typename(node->var->ty));
     return;
   case ND_COND: {
     int c = count();
-    gen_expr(node->cond, false);
+    gen_expr(node->cond, is_bottom, false);
     cmp_zero(node->cond->ty);
     println("  brtrue _L_else_%d", c);
-    gen_expr(node->then, will_discard);
+    gen_expr(node->then, is_bottom, will_discard);
     println("  br _L_end_%d", c);
     println("_L_else_%d:", c);
-    gen_expr(node->els, will_discard);
+    gen_expr(node->els, is_bottom, will_discard);
     println("_L_end_%d:", c);
     return;
   }
   case ND_NOT:
-    gen_expr(node->lhs, will_discard);
+    gen_expr(node->lhs, is_bottom, will_discard);
     if (!will_discard)
       cmp_zero(node->lhs->ty);
     return;
   case ND_BITNOT:
-    gen_expr(node->lhs, will_discard);
+    gen_expr(node->lhs, is_bottom, will_discard);
     if (!will_discard)
       println("  not");
     return;
   case ND_LOGAND: {
     int c = count();
     if (!will_discard) {
-      gen_expr(node->lhs, false);
+      gen_expr(node->lhs, is_bottom, false);
       cmp_zero(node->lhs->ty);
       println("  brtrue _L_false_%d", c);
-      gen_expr(node->rhs, false);
+      gen_expr(node->rhs, is_bottom, false);
       cmp_zero(node->rhs->ty);
       println("  brtrue.s _L_false_%d", c);
       println("  ldc.i4.1");
@@ -923,10 +945,10 @@ static void gen_expr(Node *node, bool will_discard) {
       println("  ldc.i4.0");
       println("_L_end_%d:", c);
     } else {
-      gen_expr(node->lhs, false);
+      gen_expr(node->lhs, is_bottom, false);
       cmp_zero(node->lhs->ty);
       println("  brtrue _L_end_%d", c);
-      gen_expr(node->rhs, true);
+      gen_expr(node->rhs, is_bottom, true);
       println("_L_end_%d:", c);
     }
     return;
@@ -934,10 +956,10 @@ static void gen_expr(Node *node, bool will_discard) {
   case ND_LOGOR: {
     int c = count();
     if (!will_discard) {
-      gen_expr(node->lhs, false);
+      gen_expr(node->lhs, is_bottom, false);
       cmp_zero(node->lhs->ty);
       println("  brfalse _L_true_%d", c);
-      gen_expr(node->rhs, false);
+      gen_expr(node->rhs, is_bottom, false);
       cmp_zero(node->rhs->ty);
       println("  brfalse.s _L_true_%d", c);
       println("  ldc.i4.0");
@@ -946,21 +968,21 @@ static void gen_expr(Node *node, bool will_discard) {
       println("  ldc.i4.1");
       println("_L_end_%d:", c);
     } else {
-      gen_expr(node->lhs, false);
+      gen_expr(node->lhs, is_bottom, false);
       cmp_zero(node->lhs->ty);
       println("  brfalse _L_end_%d", c);
-      gen_expr(node->rhs, true);
+      gen_expr(node->rhs, is_bottom, true);
       println("_L_end_%d:", c);
     }
     return;
   }
   case ND_FUNCALL:
-    gen_funcall(node, will_discard);
+    gen_funcall(node, is_bottom, will_discard);
     return;
   }
 
-  gen_expr(node->lhs, will_discard);
-  gen_expr(node->rhs, will_discard);
+  gen_expr(node->lhs, is_bottom, will_discard);
+  gen_expr(node->rhs, false, will_discard);
 
   if (will_discard)
     return;
@@ -1074,40 +1096,40 @@ static void gen_dummy_value(Type *ty) {
 }
 
 // When true is returned, the execution flow continues.
-static AfterStmt gen_stmt(Node *node) {
+static AfterStmt gen_stmt(Node *node, bool is_bottom) {
   gen_location(node);
 
   switch (node->kind) {
   case ND_IF: {
     int c = count();
-    gen_expr(node->cond, false);
+    gen_expr(node->cond, is_bottom, false);
     cmp_zero(node->cond->ty);
     println("  brtrue _L_else_%d", c);
-    if (gen_stmt(node->then) == AS_CONTINUE)
+    if (gen_stmt(node->then, is_bottom) == AS_CONTINUE)
       println("  br _L_end_%d", c);
     println("_L_else_%d:", c);
     if (node->els)
-      gen_stmt(node->els);
+      gen_stmt(node->els, is_bottom);
     println("_L_end_%d:", c);
     return AS_CONTINUE;
   }
   case ND_FOR: {
     int c = count();
     if (node->init) {
-      if (gen_stmt(node->init) != AS_CONTINUE)
+      if (gen_stmt(node->init, is_bottom) != AS_CONTINUE)
         unreachable();
     }
     println("_L_begin_%d:", c);
     if (node->cond) {
-      gen_expr(node->cond, false);
+      gen_expr(node->cond, is_bottom, false);
       cmp_zero(node->cond->ty);
       println("  brtrue %s", node->brk_label);
     }
-    AfterStmt req = gen_stmt(node->then);
+    AfterStmt req = gen_stmt(node->then, is_bottom);
     if ((req == AS_CONTINUE) || node->is_resolved_cont) {
       println("%s:", node->cont_label);
       if (node->inc)
-        gen_expr(node->inc, true);
+        gen_expr(node->inc, is_bottom, true);
       println("  br _L_begin_%d", c);
     }
     println("%s:", node->brk_label);
@@ -1116,20 +1138,20 @@ static AfterStmt gen_stmt(Node *node) {
   case ND_DO: {
     int c = count();
     println("_L_begin_%d:", c);
-    AfterStmt req = gen_stmt(node->then);
+    AfterStmt req = gen_stmt(node->then, is_bottom);
     if ((req == AS_CONTINUE) || node->is_resolved_cont) {
       println("%s:", node->cont_label);
-      gen_expr(node->cond, false);
-    cmp_zero(node->cond->ty);
-    println("  brfalse _L_begin_%d", c);
+      gen_expr(node->cond, is_bottom, false);
+      cmp_zero(node->cond->ty);
+      println("  brfalse _L_begin_%d", c);
     }
     println("%s:", node->brk_label);
     return AS_CONTINUE;
   }
   case ND_SWITCH:
-    gen_expr(node->cond, true);
+    gen_expr(node->cond, is_bottom, true);
     for (Node *n = node->case_next; n; n = n->case_next) {
-      gen_addr(node);
+      gen_addr(node, is_bottom);
       load(node->var->ty);
       switch (node->cond->ty->kind) {
       case TY_LONG:
@@ -1149,23 +1171,23 @@ static AfterStmt gen_stmt(Node *node) {
       println("  br %s", node->default_case->label);
     else
       println("  br %s", node->brk_label);
-    gen_stmt(node->then);
+    gen_stmt(node->then, is_bottom);
     println("%s:", node->brk_label);
     return AS_CONTINUE;
   case ND_CASE:
     println("%s:", node->label);
-    return gen_stmt(node->lhs);
+    return gen_stmt(node->lhs, is_bottom);
   case ND_BLOCK: {
     Node *n = node->body;
     AfterStmt res = AS_CONTINUE;
     while (n) {
       if (res == AS_CONTINUE) {
-        AfterStmt req = gen_stmt(n);
+        AfterStmt req = gen_stmt(n, is_bottom);
         if (req != AS_CONTINUE)
           res = req;
       } else if (n->kind == ND_CASE || (n->kind == ND_LABEL && n->is_resolved_label)) {
         res = AS_CONTINUE;
-        AfterStmt req = gen_stmt(n);
+        AfterStmt req = gen_stmt(n, is_bottom);
         if (req != AS_CONTINUE)
           res = req;
       }
@@ -1178,13 +1200,13 @@ static AfterStmt gen_stmt(Node *node) {
     return AS_JUMP_ANOTHER;
   case ND_LABEL:
     println("%s:", node->unique_label);
-    return gen_stmt(node->lhs);
+    return gen_stmt(node->lhs, is_bottom);
   case ND_RETURN:
     if (node->lhs) {
       if (current_fn->ty->return_ty->kind != TY_VOID)
-        gen_expr(node->lhs, false);
+        gen_expr(node->lhs, is_bottom, false);
       else
-        gen_expr(node->lhs, true);
+        gen_expr(node->lhs, is_bottom, true);
     } else {
       if (current_fn->ty->return_ty->kind != TY_VOID)
         // Made valid CIL sequence.
@@ -1193,7 +1215,7 @@ static AfterStmt gen_stmt(Node *node) {
     println("  br _L_return");
     return AS_JUMP_ANOTHER;
   case ND_EXPR_STMT:
-    gen_expr(node->lhs, true);
+    gen_expr(node->lhs, is_bottom, true);
     return AS_CONTINUE;
   case ND_ASM:
     println("  %s", node->asm_str);
@@ -1389,7 +1411,7 @@ static void emit_data_alloc(Obj *var, bool is_static) {
       println("  ldc.i8 %ld", var->ty->size->val);
       println("  conv.u");
     } else
-      gen_sizeof(var->ty);
+      gen_sizeof(var->ty, false);
     println("  ldftn __tls_init_$%s", var->name);
     println("  call __alloc_tls_slot");
     println("  stsfld __tls_%s__", var->name);
@@ -1401,7 +1423,7 @@ static void emit_data_alloc(Obj *var, bool is_static) {
       println("  ldc.i8 %ld", var->ty->size->val);
       println("  conv.u");
     } else
-      gen_sizeof(var->ty);
+      gen_sizeof(var->ty, false);
     println("  call calloc");    // ***MOVESFLD***
     println("  stsfld %s", var->name);
   }
@@ -1431,7 +1453,7 @@ static void emit_non_tls_data_init(Obj *var, bool is_static) {
 
   if (var->init_expr) {
     lvar_offset = 0;
-    gen_expr(var->init_expr, true);
+    gen_expr(var->init_expr, false, true);
   }
 }
 
@@ -1461,7 +1483,7 @@ static void emit_tls_data_init(Obj *var) {
 
   if (var->init_expr) {
     lvar_offset = 0;
-    gen_expr(var->init_expr, true);
+    gen_expr(var->init_expr, false, true);
   }
 
   println("  ret");
@@ -1586,7 +1608,7 @@ static void emit_text(Obj *prog) {
     }
 
     // Emit code
-    AfterStmt req = gen_stmt(fn->body);
+    AfterStmt req = gen_stmt(fn->body, true);
     if (req == AS_CONTINUE) {
       if (fn->ty->return_ty->kind != TY_VOID)
         // Made valid CIL sequence.

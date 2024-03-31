@@ -17,3 +17,5 @@ int memcmp(char *p, char *q, size_t n);
 void exit(int code);
 int getptrsize();
 long strlen(char *s);
+void *memcpy(void *dest, void *src, size_t n);
+void *alloca(size_t size);
