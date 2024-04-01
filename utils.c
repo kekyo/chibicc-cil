@@ -69,6 +69,7 @@ char *to_cil_typename(Type *ty) {
         ty->cil_name = format("%s[*]", to_cil_typename(ty->base));
       return ty->cil_name;
     }
+    case TY_VLA:
     case TY_PTR: {
       ty->cil_name = format("%s*", to_cil_typename(ty->base));
       return ty->cil_name;

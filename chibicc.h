@@ -340,6 +340,7 @@ typedef enum {
   TY_PTR,
   TY_FUNC,
   TY_ARRAY,
+  TY_VLA, // variable-length array
   TY_STRUCT,
   TY_UNION,
   TY_VA_LIST,
@@ -371,6 +372,10 @@ struct Type {
 
   // Array
   int array_len;
+
+  // Variable-length array
+  Node *vla_len; // # of elements
+  Obj *vla_size; // sizeof() value
 
   // Enum/Struct/Union
   TagScope *tag_scope;
@@ -456,6 +461,7 @@ Type *copy_type(Type *ty);
 Type *pointer_to(Type *base, Token *tok);
 Type *func_type(Type *return_ty, Token *tok);
 Type *array_of(Type *base, int size, Token *tok);
+Type *vla_of(Type *base, Node *expr, Token *tok);
 Type *enum_type(Token *tok);
 Type *struct_type(Token *tok);
 void add_type(Node *node);

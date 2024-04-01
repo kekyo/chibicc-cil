@@ -215,6 +215,15 @@ Type *array_of(Type *base, int len, Token *tok) {
   return ty;
 }
 
+Type *vla_of(Type *base, Node *len, Token *tok) {
+  Type *ty = new_type(TY_VLA);
+  ty->base = base;
+  ty->vla_len = len;
+  ty->align = base->align;
+  ty->tok = tok;
+  return ty;
+}
+
 Type *enum_type(Token *tok) {
   Type *ty = new_type(TY_ENUM);
   ty->align = size4_node;
@@ -349,7 +358,7 @@ void add_type(Node *node) {
     node->ty = ty_int;
     return;
   case ND_FUNCALL:
-    node->ty = ty_int;
+    node->ty = node->func_ty->return_ty;
     return;
   case ND_NOT:
   case ND_LOGOR:
