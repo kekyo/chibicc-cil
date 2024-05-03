@@ -191,4 +191,29 @@ check '-x none'
 echo foo | $chibicc -E - | grep -q foo
 check -E
 
+# .a file
+echo 'void foo() {}' | $chibicc -c -xc -o $tmp/foo.o -
+echo 'void bar() {}' | $chibicc -c -xc -o $tmp/bar.o -
+cil-chibiar rcs $tmp/foo.a $tmp/foo.o $tmp/bar.o
+#/home/kouji/Projects/chibicc-cil-toolchain/chibiar/chibiar/bin/Debug/net6.0/cil-chibiar rcs $tmp/foo.a $tmp/foo.o $tmp/bar.o
+echo 'void foo(); void bar(); int main() { foo(); bar(); }' > $tmp/main.c
+$chibicc -o $tmp/foo $tmp/main.c $tmp/foo.a
+check '.a'
+
+# .so file
+#echo 'void foo() {}' | cc -fPIC -c -xc -o $tmp/foo.o -
+#echo 'void bar() {}' | cc -fPIC -c -xc -o $tmp/bar.o -
+#cc -shared -o $tmp/foo.so $tmp/foo.o $tmp/bar.o
+#echo 'void foo(); void bar(); int main() { foo(); bar(); }' > $tmp/main.c
+#$chibicc -o $tmp/foo $tmp/main.c $tmp/foo.so
+#check '.so'
+
+# .dll file
+echo 'void foo() {}' | $chibicc -c -xc -o $tmp/foo.o -
+echo 'void bar() {}' | $chibicc -c -xc -o $tmp/bar.o -
+$chibicc -shared -o $tmp/foo.dll $tmp/foo.o $tmp/bar.o
+echo 'void foo(); void bar(); int main() { foo(); bar(); }' > $tmp/main.c
+$chibicc -o $tmp/main $tmp/main.c $tmp/foo.dll
+check '.dll'
+
 echo OK

@@ -1,6 +1,8 @@
 #include "chibicc.h"
 
-typedef enum { FILE_NONE, FILE_C, FILE_ASM, FILE_OBJ } FileType;
+typedef enum {
+  FILE_NONE, FILE_C, FILE_ASM, FILE_OBJ, FILE_AR, FILE_DSO, FILE_DLL,
+} FileType;
 
 static MemoryModel opt_mm = AnyCPU;
 
@@ -13,6 +15,7 @@ static bool opt_S;
 static bool opt_c;
 static bool opt_cc1;
 static bool opt_hash_hash_hash;
+static bool opt_shared;
 static char *opt_o;
 
 static StringArray ld_extra_args;
@@ -199,6 +202,12 @@ static void parse_args(int argc, char **argv) {
 
     if (!strcmp(argv[i], "-idirafter")) {
       strarray_push(&idirafter, argv[i++]);
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-shared")) {
+      opt_shared = true;
+      strarray_push(&ld_extra_args, "-shared");
       continue;
     }
 
@@ -449,7 +458,7 @@ static char *find_libpath(void) {
   error("library path is not found");
 }
 
-static char *find_gcc_libpath(void) {
+static char *find_chibicc_libpath(void) {
   char *libcpath = format("%s/Projects/libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll", getenv("HOME"));
   char *paths[] = {
     libcpath
@@ -461,7 +470,7 @@ static char *find_gcc_libpath(void) {
       return strdup(dirname(path));
   }
 
-  error("gcc library path is not found");
+  error("chibicc library path is not found");
 }
 
 static char *find_apphostpath(void) {
@@ -473,33 +482,40 @@ static char *find_apphostpath(void) {
 static void run_linker(StringArray *inputs, char *output) {
   StringArray arr = {};
 
-  char *apphostpath = find_apphostpath();
-
   //strarray_push(&arr, "/home/kouji/Projects/chibicc-cil-toolchain/chibild/chibild/bin/Debug/net6.0/cil-chibild");
   strarray_push(&arr, "cil-chibild");
   strarray_push(&arr, "-o");
   strarray_push(&arr, output);
-  strarray_push(&arr, "-mnet6.0");
-
-  if (apphostpath) {
-    strarray_push(&arr, "-a");
-    strarray_push(&arr, apphostpath);
-  }
+  strarray_push(&arr, "-m");
+  strarray_push(&arr, "net6.0");
 
   char *libpath = find_libpath();
-  char *gcc_libpath = find_gcc_libpath();
+  char *chibicc_libpath = find_chibicc_libpath();
 
-  strarray_push(&arr, format("-L%s", gcc_libpath));
+  if (opt_shared) {
+    strarray_push(&arr, "-shared");
+  } else {
+    strarray_push(&arr, format("-d%s/crt0", chibicc_libpath));
+  }
+
+  strarray_push(&arr, format("-L%s", chibicc_libpath));
   strarray_push(&arr, format("-L%s", libpath));
 
   for (int i = 0; i < ld_extra_args.len; i++)
     strarray_push(&arr, ld_extra_args.data[i]);
 
+  strarray_push(&arr, "-lSystem.Private.CoreLib");
+  strarray_push(&arr, "-lc-bootstrap");
+
   for (int i = 0; i < inputs->len; i++)
     strarray_push(&arr, inputs->data[i]);
 
-  strarray_push(&arr, "-lc-bootstrap");
-  strarray_push(&arr, "-lSystem.Private.CoreLib");
+  char *apphostpath = find_apphostpath();
+  if (apphostpath) {
+    strarray_push(&arr, "-a");
+    strarray_push(&arr, apphostpath);
+  }
+
   strarray_push(&arr, NULL);
 
   run_subprocess(arr.data);
@@ -512,6 +528,14 @@ static FileType get_file_type(char *filename) {
   if (opt_x != FILE_NONE)
     return opt_x;
 
+  if (endswith(filename, ".a"))
+    return FILE_AR;
+  if (endswith(filename, ".so"))
+    return FILE_DSO;
+  if (endswith(filename, ".dll"))
+    return FILE_DLL;
+  if (endswith(filename, ".o"))
+    return FILE_OBJ;
   if (endswith(filename, ".c"))
     return FILE_C;
   if (endswith(filename, ".s"))
@@ -554,8 +578,8 @@ int main(int argc, char **argv) {
 
     FileType type = get_file_type(input);
 
-    // Handle .o
-    if (type == FILE_OBJ) {
+    // Handle .o or .a
+    if (type == FILE_OBJ || type == FILE_AR || type == FILE_DSO || type == FILE_DLL) {
       strarray_push(&ld_args, input);
       continue;
     }

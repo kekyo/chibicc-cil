@@ -1,5 +1,7 @@
 #include "chibicc.h"
 
+extern char *realpath(const char *name, char *resolved);
+
 // Input file
 static File *current_file;
 
@@ -685,6 +687,10 @@ File **get_input_files(void) {
 File *new_file(char *name, int file_no, char *contents) {
   File *file = calloc(1, sizeof(File));
   file->name = name;
+  file->fullpath = realpath(name, NULL);
+  if (file->fullpath == NULL) {
+    file->fullpath = name;
+  }
   file->display_name = name;
   file->file_no = file_no;
   file->contents = contents;

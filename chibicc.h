@@ -67,6 +67,7 @@ typedef enum {
 
 typedef struct {
   char *name;
+  char *fullpath;
   int file_no;
   char *contents;
 

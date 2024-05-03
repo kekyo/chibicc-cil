@@ -1393,6 +1393,8 @@ static void emit_data_alloc(Obj *var, bool is_static) {
     emit_data_alloc(var->next, is_static);
   if (var->is_function || !var->is_definition)
     return;
+  if (var->is_static != is_static)
+    return;
 
   // C.data.ptr ??= <allocator>();
   int c = count();
@@ -1626,9 +1628,13 @@ static void emit_text(Obj *prog) {
 void codegen(Obj *prog, FILE *out) {
   output_file = out;
 
+  fprintf(output_file, ";cil-chibicc\n\n");
+
   File **files = get_input_files();
   for (int i = 0; files[i]; i++)
-    println(".file %d \"%s\" c\n", files[i]->file_no, files[i]->name);
+    println(".file %d \"%s\" c", files[i]->file_no, files[i]->fullpath);
+
+  fprintf(output_file, "\n");
 
   assign_lvar_offsets(prog);
   aggregate_types(prog);
