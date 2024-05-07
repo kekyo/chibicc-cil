@@ -11,6 +11,7 @@ struct UsingType
 };
 
 static UsingType *using_type = NULL;
+static HashMap using_type_map;
 static int lvar_offset = -1;
 
 typedef enum {
@@ -44,14 +45,11 @@ static int count(void) {
 }
 
 static bool add_using_type(Type *ty) {
-  UsingType *pt = using_type;
-  while (pt) {
-    if (pt->ty == ty)
-      return false;
-    pt = pt->next;
+  if (!hashmap_put(&using_type_map, to_cil_typename(ty), (void *)1)) {
+    return false;
   }
 
-  pt = calloc(sizeof(UsingType), 1);
+  UsingType *pt = calloc(sizeof(UsingType), 1);
   pt->ty = ty;
   pt->next = using_type;
   using_type = pt;
@@ -59,6 +57,10 @@ static bool add_using_type(Type *ty) {
 }
 
 static void aggregate_type_recursive(Type *ty) {
+  if (ty->is_aggregated)
+    return;
+  ty->is_aggregated = true;
+
   switch (ty->kind) {
     case TY_PTR:
     case TY_ARRAY:
@@ -90,6 +92,9 @@ static void aggregate_type_recursive(Type *ty) {
 }
 
 static void aggregate_type(Type *ty) {
+  if (ty->is_aggregated)
+    return;
+  
   if (add_using_type(ty))
     aggregate_type_recursive(ty);
 }

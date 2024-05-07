@@ -67,8 +67,8 @@ typedef struct HashMap {
 
 void *hashmap_get(HashMap *map, char *key);
 void *hashmap_get2(HashMap *map, char *key, int keylen);
-void hashmap_put(HashMap *map, char *key, void *val);
-void hashmap_put2(HashMap *map, char *key, int keylen, void *val);
+bool hashmap_put(HashMap *map, char *key, void *val);
+bool hashmap_put2(HashMap *map, char *key, int keylen, void *val);
 void hashmap_delete(HashMap *map, char *key);
 void hashmap_delete2(HashMap *map, char *key, int keylen);
 void hashmap_test(void);
@@ -408,6 +408,7 @@ struct Type {
 
   // CIL specific
   bool is_public;
+  bool is_aggregated;
   char *cil_name;
 };
 

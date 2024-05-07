@@ -73,7 +73,7 @@ static HashEntry *get_entry(HashMap *map, char *key, int keylen) {
   unreachable();
 }
 
-static HashEntry *get_or_insert_entry(HashMap *map, char *key, int keylen) {
+static HashEntry *get_or_insert_entry(HashMap *map, char *key, int keylen, bool *is_insert) {
   if (!map->buckets) {
     map->buckets = calloc(INIT_SIZE, sizeof(HashEntry));
     map->capacity = INIT_SIZE;
@@ -86,12 +86,15 @@ static HashEntry *get_or_insert_entry(HashMap *map, char *key, int keylen) {
   for (int i = 0; i < map->capacity; i++) {
     HashEntry *ent = &map->buckets[(hash + i) % map->capacity];
 
-    if (match(ent, key, keylen))
+    if (match(ent, key, keylen)) {
+      *is_insert = false;
       return ent;
+    }
 
     if (ent->key == TOMBSTONE) {
       ent->key = key;
       ent->keylen = keylen;
+      *is_insert = true;
       return ent;
     }
 
@@ -99,6 +102,7 @@ static HashEntry *get_or_insert_entry(HashMap *map, char *key, int keylen) {
       ent->key = key;
       ent->keylen = keylen;
       map->used++;
+      *is_insert = true;
       return ent;
     }
   }
@@ -114,13 +118,15 @@ void *hashmap_get2(HashMap *map, char *key, int keylen) {
   return ent ? ent->val : NULL;
 }
 
-void hashmap_put(HashMap *map, char *key, void *val) {
-   hashmap_put2(map, key, strlen(key), val);
+bool hashmap_put(HashMap *map, char *key, void *val) {
+   return hashmap_put2(map, key, strlen(key), val);
 }
 
-void hashmap_put2(HashMap *map, char *key, int keylen, void *val) {
-  HashEntry *ent = get_or_insert_entry(map, key, keylen);
+bool hashmap_put2(HashMap *map, char *key, int keylen, void *val) {
+  bool is_insert;
+  HashEntry *ent = get_or_insert_entry(map, key, keylen, &is_insert);
   ent->val = val;
+  return is_insert;
 }
 
 void hashmap_delete(HashMap *map, char *key) {
