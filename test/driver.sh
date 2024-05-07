@@ -216,4 +216,7 @@ echo 'void foo(); void bar(); int main() { foo(); bar(); }' > $tmp/main.c
 $chibicc -o $tmp/main $tmp/main.c $tmp/foo.dll
 check '.dll'
 
+$chibicc -hashmap-test
+check 'hashmap'
+
 echo OK
