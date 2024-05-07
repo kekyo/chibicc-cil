@@ -219,4 +219,11 @@ check '.dll'
 $chibicc -hashmap-test
 check 'hashmap'
 
+# -M
+echo '#include "out2.h"' > $tmp/out.c
+echo '#include "out3.h"' >> $tmp/out.c
+touch $tmp/out2.h $tmp/out3.h
+$chibicc -M -I$tmp $tmp/out.c | grep -q -z '^out.o: .*/out\.c .*/out2\.h .*/out3\.h'
+check -M
+
 echo OK
