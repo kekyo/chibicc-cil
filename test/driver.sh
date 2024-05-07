@@ -293,4 +293,12 @@ $chibicc -Wl,-O,-g1 -o $tmp/foo.exe $tmp/foo.o $tmp/bar.o $tmp/baz.o
 file $tmp/foo.pdb | grep -q "Microsoft Roslyn C# debugging symbols"
 check -Wl,
 
+# -Xlinker
+echo 'int foo() {}' | $chibicc -c -o $tmp/foo.o -xc -
+echo 'int foo() {}' | $chibicc -c -o $tmp/bar.o -xc -
+echo 'int main() {}' | $chibicc -c -o $tmp/baz.o -xc -
+$chibicc -Xlinker -O -Xlinker -g1 -o $tmp/foo.exe $tmp/foo.o $tmp/bar.o $tmp/baz.o
+file $tmp/foo.pdb | grep -q "Microsoft Roslyn C# debugging symbols"
+check -Xlinker
+
 echo OK
