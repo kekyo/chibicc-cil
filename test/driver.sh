@@ -257,4 +257,10 @@ $chibicc -c -MD -MF $tmp/md-mf.d -I. $tmp/md2.c
 grep -q -z '^md2.o:.*md2\.c .*/out2\.h' $tmp/md-mf.d
 check -MD
 
+echo 'int foo() { return 123; }' | $chibicc -fPIC -xc -c -o $tmp/foo.o -
+$chibicc -shared -o $tmp/foo.dll $tmp/foo.o
+echo 'int foo(); int main() { foo(); }' > $tmp/main.c
+$chibicc -o $tmp/foo $tmp/main.c $tmp/foo.dll
+check -fPIC
+
 echo OK
