@@ -297,9 +297,13 @@ struct Node {
   Node *goto_next;
   bool is_resolved_label;
 
-  // Switch-cases
+  // Switch
   Node *case_next;
   Node *default_case;
+
+  // Case
+  long begin;
+  long end;
 
   // "asm" string literal
   char *asm_str;

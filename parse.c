@@ -1390,7 +1390,7 @@ static Node *asm_stmt(Token **rest, Token *tok) {
 // stmt = "return" expr? ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "switch" "(" expr ")" stmt
-//      | "case" const-expr ":" stmt
+//      | "case" const-expr ("..." const-expr)? ":" stmt
 //      | "default" ":" stmt
 //      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
@@ -1466,13 +1466,31 @@ static Node *stmt(Token **rest, Token *tok) {
       error_tok(tok, "stray case");
 
     Node *node = new_node(ND_CASE, tok);
-    int val = const_expr(&tok, tok->next);
+    long begin = const_expr(&tok, tok->next);
+    long end;
+
+    if (equal(tok, "...")) {
+      // [GNU] Case ranges, e.g. "case 1 ... 5:"
+      end = const_expr(&tok, tok->next);
+      if (end < begin)
+        error_tok(tok, "empty case range specified");
+      node->label = new_unique_name(format("switch_case_%ld", begin));
+    } else {
+      end = begin;
+      node->label = new_unique_name(format("switch_case_%ld_%ld", begin, end));
+    }
+
     tok = skip(tok, ":");
-    node->label = new_unique_name(format("switch_case_%d", val));
     node->lhs = stmt(rest, tok);
-    node->val = val;
-    node->case_next = current_switch->case_next;
-    current_switch->case_next = node;
+    node->begin = begin;
+    node->end = end;
+
+    // Append it.
+    Node *last_case = current_switch;
+    while (last_case->case_next)
+      last_case = last_case->case_next;
+    last_case->case_next = node;
+
     return node;
   }
 

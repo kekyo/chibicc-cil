@@ -1150,22 +1150,31 @@ static AfterStmt gen_stmt(Node *node, bool is_bottom) {
   }
   case ND_SWITCH:
     gen_expr(node->cond, is_bottom, true);
+    char *temp_name;
+    for (Node *n = node->case_next; n; n = n->case_next) {
+      if (n->begin != n->end) {
+        temp_name = gen_make_temp(node->var->ty);
+        break;
+      }
+    }
     for (Node *n = node->case_next; n; n = n->case_next) {
       gen_addr(node, is_bottom);
       load(node->var->ty);
-      switch (node->cond->ty->kind) {
-      case TY_LONG:
-        println("  ldc.i8 %ld", n->val);
-        break;
-      case TY_NINT:
-        println("  ldc.i8 %ld", n->val);
-        println("  conv.i");
-        break;
-      default:
-        println("  ldc.i4 %d", (int32_t)n->val);
-        break;
+      if (n->begin == n->end) {
+        gen_const_integer(node->cond->ty, n->begin);
+        println("  beq %s", n->label);
+      } else {
+        // [GNU] Case ranges
+        int c = count();
+        println("  stloc %s", temp_name);
+        println("  ldloc %s", temp_name);
+        gen_const_integer(node->cond->ty, n->begin);
+        println("  blt _L_casenext_%d", c);
+        println("  ldloc %s", temp_name);
+        gen_const_integer(node->cond->ty, n->end);
+        println("  ble %s", n->label);
+        println("_L_casenext_%d:", c);
       }
-      println("  beq %s", n->label);
     }
     if (node->default_case)
       println("  br %s", node->default_case->label);
