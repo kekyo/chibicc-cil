@@ -10,6 +10,7 @@ int strncmp(char *s1, char *s2, size_t n);
 void *memcpy(void *dst, void *src, size_t n);
 char *strndup(char *p, size_t n);
 char *strdup(char *p);
+char *strtok(char *str, const char *delim);
 char *strstr(char *haystack, char *needle);
 char *strchr(char *s, int c);
 double strtod(char *nptr, char **endptr);
