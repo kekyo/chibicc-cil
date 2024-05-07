@@ -147,18 +147,20 @@ static void leave_scope(void) {
 
 // Find a variable by name.
 static VarScope *find_var(Token *tok) {
-  for (Scope *sc = scope; sc; sc = sc->next)
-    for (VarScope *sc2 = sc->vars; sc2; sc2 = sc2->next)
-      if (equal(tok, sc2->name))
-        return sc2;
+  for (Scope *sc = scope; sc; sc = sc->next) {
+    VarScope *sc2 = hashmap_get2(&sc->vars, tok->loc, tok->len);
+    if (sc2)
+      return sc2;
+  }
   return NULL;
 }
 
 static Type *find_tag(Token *tok) {
-  for (Scope *sc = scope; sc; sc = sc->next)
-    for (TagScope *sc2 = sc->tags; sc2; sc2 = sc2->next)
-      if (equal(tok, sc2->name))
-        return sc2->ty;
+  for (Scope *sc = scope; sc; sc = sc->next) {
+    Type *ty = hashmap_get2(&sc->tags, tok->loc, tok->len);
+    if (ty)
+      return ty;
+  }
   return NULL;
 }
 
@@ -229,10 +231,8 @@ Node *new_cast(Node *expr, Type *ty) {
 
 static VarScope *push_scope(char *name) {
   VarScope *sc = calloc(1, sizeof(VarScope));
-  sc->name = name;
-  sc->next = scope->vars;
   sc->scope = scope;
-  scope->vars = sc;
+  hashmap_put(&scope->vars, name, sc);
   return sc;
 }
 
@@ -353,13 +353,8 @@ static Type *find_typedef(Token *tok) {
 }
 
 static void push_tag_scope(Token *tok, Type *ty) {
-  TagScope *sc = calloc(1, sizeof(TagScope));
-  sc->name = strndup(tok->loc, tok->len);
-  sc->ty = ty;
-  sc->next = scope->tags;
-  sc->scope = scope;
-  scope->tags = sc;
-  ty->tag_scope = sc;
+  ty->tag_name = strndup(tok->loc, tok->len);
+  hashmap_put2(&scope->tags, tok->loc, tok->len, ty);
 }
 
 // declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
@@ -2358,12 +2353,10 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
   if (tag) {
     // If this is a redefinition, overwrite a previous type.
     // Otherwise, register the struct type.
-    for (TagScope *sc = scope->tags; sc; sc = sc->next) {
-      if (equal(tag, sc->name)) {
-        ty->tag_scope = sc;
-        *sc->ty = *ty;
-        return sc->ty;
-      }
+    Type *ty2 = hashmap_get2(&scope->tags, tag->loc, tag->len);
+    if (ty2) {
+      *ty2 = *ty;
+      return ty2;
     }
     push_tag_scope(tag, ty);
   }
@@ -2986,9 +2979,9 @@ static Obj *find_func(char *name) {
   while (sc->next)
     sc = sc->next;
 
-  for (VarScope *sc2 = sc->vars; sc2; sc2 = sc2->next)
-    if (!strcmp(sc2->name, name) && sc2->var && sc2->var->is_function)
-      return sc2->var;
+  VarScope *sc2 = hashmap_get(&sc->vars, name);
+  if (sc2 && sc2->var && sc2->var->is_function)
+    return sc2->var;
   return NULL;
 }
 

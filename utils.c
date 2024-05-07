@@ -76,10 +76,10 @@ char *to_cil_typename(Type *ty) {
     case TY_ENUM:
     case TY_STRUCT:
     case TY_UNION: {
-      if (ty->tag_scope)
+      if (ty->tag_name)
         ty->cil_name = ty->is_public ?
-          ty->tag_scope->name :
-          format("_%s_$%d", ty->tag_scope->name, count++);
+          ty->tag_name :
+          format("_%s_$%d", ty->tag_name, count++);
       else if (ty->typedef_name) {
         char *name = get_string(ty->typedef_name);
         ty->cil_name = ty->is_public ?

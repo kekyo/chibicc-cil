@@ -29,7 +29,6 @@
 typedef struct Obj Obj;
 typedef struct Token Token;
 typedef struct VarScope VarScope;
-typedef struct TagScope TagScope;
 typedef struct Scope Scope;
 typedef struct Type Type;
 typedef struct Node Node;
@@ -49,6 +48,30 @@ typedef struct {
 
 void strarray_push(StringArray *arr, char *s);
 char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
+//
+// hashmap.c
+//
+
+typedef struct {
+  char *key;
+  int keylen;
+  void *val;
+} HashEntry;
+
+typedef struct HashMap {
+  HashEntry *buckets;
+  int capacity;
+  int used;
+} HashMap;
+
+void *hashmap_get(HashMap *map, char *key);
+void *hashmap_get2(HashMap *map, char *key, int keylen);
+void hashmap_put(HashMap *map, char *key, void *val);
+void hashmap_put2(HashMap *map, char *key, int keylen, void *val);
+void hashmap_delete(HashMap *map, char *key);
+void hashmap_delete2(HashMap *map, char *key, int keylen);
+void hashmap_test(void);
 
 //
 // tokenize.c
@@ -133,21 +156,11 @@ Token *preprocess(Token *tok);
 
 // Scope for local variables, global variables, typedefs
 // or enum constants
-struct VarScope {
-  VarScope *next;
-  char *name;
+struct VarScope{
   Obj *var;
   Type *type_def;
   Type *enum_ty;
   int enum_val;
-  Scope *scope;
-};
-
-// Scope for struct, union or enum tags
-struct TagScope {
-  TagScope *next;
-  char *name;
-  Type *ty;
   Scope *scope;
 };
 
@@ -157,8 +170,8 @@ struct Scope {
 
   // C has two block scopes; one is for variables/typedefs and
   // the other is for struct/union/enum tags.
-  VarScope *vars;
-  TagScope *tags;
+  HashMap vars;
+  HashMap tags;
 };
 
 typedef enum {
@@ -378,7 +391,7 @@ struct Type {
   int array_len;
 
   // Enum/Struct/Union
-  TagScope *tag_scope;
+  char *tag_name;
 
   // Enum
   EnumMember *enum_members;
@@ -486,30 +499,6 @@ uint32_t decode_utf8(char **new_pos, char *p);
 bool is_ident1(uint32_t c);
 bool is_ident2(uint32_t c);
 int display_width(char *p, int len);
-
-//
-// hashmap.c
-//
-
-typedef struct {
-  char *key;
-  int keylen;
-  void *val;
-} HashEntry;
-
-typedef struct {
-  HashEntry *buckets;
-  int capacity;
-  int used;
-} HashMap;
-
-void *hashmap_get(HashMap *map, char *key);
-void *hashmap_get2(HashMap *map, char *key, int keylen);
-void hashmap_put(HashMap *map, char *key, void *val);
-void hashmap_put2(HashMap *map, char *key, int keylen, void *val);
-void hashmap_delete(HashMap *map, char *key);
-void hashmap_delete2(HashMap *map, char *key, int keylen);
-void hashmap_test(void);
 
 //
 // codegen.c
