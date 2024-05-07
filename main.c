@@ -18,6 +18,7 @@ static bool opt_c;
 static bool opt_cc1;
 static bool opt_hash_hash_hash;
 static char *opt_MF;
+static char *opt_MT;
 static bool opt_shared;
 static char *opt_o;
 
@@ -37,7 +38,7 @@ static void usage(int status) {
 }
 
 static bool take_arg(char *arg) {
-  char *x[] = {"-o", "-I", "-idirafter", "-include", "-x", "-MF"};
+  char *x[] = {"-o", "-I", "-idirafter", "-include", "-x", "-MF", "-MT"};
 
   for (int i = 0; i < sizeof(x) / sizeof(*x); i++)
     if (!strcmp(arg, x[i]))
@@ -205,6 +206,14 @@ static void parse_args(int argc, char **argv) {
 
     if (!strcmp(argv[i], "-MP")) {
       opt_MP = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MT")) {
+      if (opt_MT == NULL)
+        opt_MT = argv[++i];
+      else
+        opt_MT = format("%s %s", opt_MT, argv[++i]);
       continue;
     }
 
@@ -383,7 +392,7 @@ static void print_dependencies(void) {
     path = "-";
 
   FILE *out = open_file(path);
-  fprintf(out, "%s:", replace_extn(base_file, ".o"));
+  fprintf(out, "%s:", opt_MT ? opt_MT : replace_extn(base_file, ".o"));
 
   File **files = get_input_files();
 
