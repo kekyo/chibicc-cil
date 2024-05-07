@@ -278,4 +278,11 @@ echo 'int foo(); int bar=3; int main() { foo(); }' > $tmp/bar.c
 $chibicc -static -o $tmp/foo.dll $tmp/foo.c $tmp/bar.c
 check -static
 
+# -L
+echo 'int foo() { return 123; }' > $tmp/foo.c
+$chibicc -fPIC -shared -o $tmp/libfoobar.dll $tmp/foo.c
+echo 'int foo(); int main() { foo(); }' > $tmp/bar.c
+$chibicc -o $tmp/foo $tmp/bar.c -L$tmp -lfoobar
+check -L
+
 echo OK
