@@ -305,4 +305,15 @@ $chibicc -Xlinker -O -Xlinker -g1 -o $tmp/foo.exe $tmp/foo.o $tmp/bar.o $tmp/baz
 file $tmp/foo.pdb | grep -q "Microsoft Roslyn C# debugging symbols"
 check -Xlinker
 
+# -B
+mkdir $tmp/baz
+echo '#include <stdio.h>' > $tmp/foo.c
+echo 'void main() { printf("ABC\n"); }' >> $tmp/foo.c
+$chibicc -o $tmp/baz/foobar $tmp/foo.c
+echo 'extern int system(const char *command);' > $tmp/bar.c
+echo 'void main() { system("foobar"); }' >> $tmp/bar.c
+$chibicc -B$tmp/baz -o $tmp/foo $tmp/bar.c
+$tmp/foo
+check -B
+
 echo OK
