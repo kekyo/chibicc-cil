@@ -316,4 +316,9 @@ $chibicc -B$tmp/baz -o $tmp/foo $tmp/bar.c
 $tmp/foo
 check -B
 
+# -isystem
+echo foo > $tmp/dir/isystem-option-test
+echo "#include <isystem-option-test>" | $chibicc -isystem $tmp/dir -E -xc - | grep -q foo
+check -isystem
+
 echo OK

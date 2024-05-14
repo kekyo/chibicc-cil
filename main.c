@@ -26,6 +26,7 @@ static char *opt_o;
 
 static StringArray ld_extra_args;
 static StringArray std_include_paths;
+static StringArray system_include_paths;
 
 char *base_file;
 static char *output_file;
@@ -52,6 +53,10 @@ static bool take_arg(char *arg) {
 }
 
 static void add_default_include_paths(char *argv0) {
+  // For -isystem
+  for (int i = 0; i < system_include_paths.len; i++)
+    strarray_push(&include_paths, system_include_paths.data[i]);
+
   // We expect that chibicc-specific include files are installed
   // to ./include relative to argv[0].
   char *incdir = getenv("CHIBICC_CIL_INCLUDE_PATH");
@@ -314,6 +319,11 @@ static void parse_args(int argc, char **argv) {
     if (!strncmp(argv[i], "-L", 2)) {
       strarray_push(&ld_extra_args, "-L");
       strarray_push(&ld_extra_args, argv[i] + 2);
+      continue;
+    }
+
+    if (!strncmp(argv[i], "-isystem", 8)) {
+      strarray_push(&system_include_paths, argv[++i]);
       continue;
     }
 
