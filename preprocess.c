@@ -1074,7 +1074,7 @@ void init_macros(void) {
       define_macro("__SIZEOF_POINTER__", "4");
       define_macro("__SIZEOF_PTRDIFF_T__", "4");
       define_macro("__SIZEOF_SIZE_T__", "4");
-      define_macro("__SIZE_TYPE__", "unsigned");
+      define_macro("__SIZE_TYPE__", "unsigned int");
       break;
     default:
       define_macro("__SIZEOF_POINTER__", "(sizeof(void *))");
@@ -1090,6 +1090,16 @@ void init_macros(void) {
   define_macro("__SIZEOF_LONG_DOUBLE__", "8");
   define_macro("__SIZEOF_LONG_LONG__", "8");
   define_macro("__SIZEOF_SHORT__", "2");
+  define_macro("__INT8_TYPE__", "signed char");
+  define_macro("__UINT8_TYPE__", "unsigned char");
+  define_macro("__INT16_TYPE__", "short int");
+  define_macro("__UINT16_TYPE__", "short unsigned int");
+  define_macro("__INT32_TYPE__", "int");
+  define_macro("__UINT32_TYPE__", "unsigned int");
+  define_macro("__INT64_TYPE__", "long int");
+  define_macro("__UINT64_TYPE__", "long unsigned int");
+  define_macro("__INTPTR_TYPE__", "__builtin_nint");
+  define_macro("__UINTPTR_TYPE__", "__builtin_nuint");
   define_macro("__IEEE_LITTLE_ENDIAN", "1");
   define_macro("__C99_MACRO_WITH_VA_ARGS", "1");
   define_macro("__STDC_HOSTED__", "1");
@@ -1106,17 +1116,15 @@ void init_macros(void) {
   define_macro("__cil__", "1");
   define_macro("__chibicc__", "1");
   define_macro("__const__", "const");
-  define_macro("__gnu_linux__", "1");
   define_macro("__inline__", "inline");
-  define_macro("__linux", "1");
-  define_macro("__linux__", "1");
   define_macro("__signed__", "signed");
   define_macro("__typeof__", "typeof");
   define_macro("__unix", "1");
   define_macro("__unix__", "1");
   define_macro("__volatile__", "volatile");
-  define_macro("linux", "1");
   define_macro("unix", "1");
+  define_macro("_POSIX_THREADS", "1");
+  define_macro("__extension__", "");
 
   add_builtin("__FILE__", file_macro);
   add_builtin("__LINE__", line_macro);

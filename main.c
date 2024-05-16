@@ -345,6 +345,7 @@ static void parse_args(int argc, char **argv) {
         !strcmp(argv[i], "-fcommon") ||
         !strcmp(argv[i], "-fno-common") ||
         !strcmp(argv[i], "-m64") ||
+        !strcmp(argv[i], "-m32") ||
         !strcmp(argv[i], "-mno-red-zone") ||
         !strcmp(argv[i], "-pthread") ||
         !strcmp(argv[i], "-static") ||
