@@ -1642,7 +1642,7 @@ static void emit_text(Obj *prog) {
 void codegen(Obj *prog, FILE *out) {
   output_file = out;
 
-  fprintf(output_file, ";cil-chibicc\n\n");
+  fprintf(output_file, ";cil-ecma-object\n\n");
 
   File **files = get_input_files();
   for (int i = 0; files[i]; i++)

@@ -14,6 +14,7 @@ long fread(void *ptr, size_t size, size_t nmemb, FILE *fp);
 size_t fwrite(void *ptr, size_t size, size_t nmemb, FILE *fp);
 int fflush(FILE *fp);
 int fclose(FILE *fp);
+int ferror(FILE *fp);
 int fputc(int c, FILE *fp);
 int feof(FILE *fp);
 int printf(char *fmt, ...);

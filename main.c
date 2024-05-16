@@ -54,7 +54,14 @@ static bool take_arg(char *arg) {
 static void add_default_include_paths(char *argv0) {
   // We expect that chibicc-specific include files are installed
   // to ./include relative to argv[0].
-  strarray_push(&include_paths, format("%s/include", dirname(strdup(argv0))));
+  char *incdir = getenv("CHIBICC_CIL_INCLUDE_PATH");
+  if (incdir == NULL)
+    incdir = format("%s/include", dirname(strdup(argv0)));
+  strarray_push(&include_paths, incdir);
+
+  incdir = getenv("CHIBICC_CIL_ADDITIONAL_INCLUDE_PATH");
+  if (incdir != NULL)
+    strarray_push(&include_paths, incdir);
 
   // Add standard include paths.
   //strarray_push(&include_paths, "/usr/local/include");
@@ -390,7 +397,8 @@ static char *create_tmpfile(void) {
     error("mkstemp failed: %s", strerror(errno));
   close(fd);
 
-  strarray_push(&tmpfiles, path);
+  if (!opt_hash_hash_hash)
+    strarray_push(&tmpfiles, path);
   return path;
 }
 
@@ -579,9 +587,15 @@ static void cc1(void) {
 }
 
 static void assemble(char *input, char *output) {
+  static char *aspath = NULL;
+  if (aspath == NULL) {
+    aspath = getenv("CHIBIAS_CIL_PATH");
+    if (aspath == NULL)
+      aspath = "cil-ecma-chibias";
+  }
+
   char *cmd[] = {
-    //"/home/kouji/Projects/chibicc-cil-toolchain/chibias/chibias/bin/Debug/net6.0/cil-chibias",
-    "cil-chibias",
+    aspath,
     "-c", input, "-o", output, NULL };
   run_subprocess(cmd);
 }
@@ -620,8 +634,15 @@ static char *find_libpath(void) {
   error("library path is not found");
 }
 
-static char *find_chibicc_libpath(void) {
-  char *libcpath = format("%s/Projects/libc-cil/libc-bootstrap/bin/Debug/netstandard2.0/libc-bootstrap.dll", getenv("HOME"));
+static char *find_chibicc_libpath(char *argv0) {
+  static char *libdir = NULL;
+  if (libdir == NULL) {
+    libdir = getenv("CHIBICC_CIL_LIB_PATH");
+    if (libdir == NULL)
+      libdir = format("%s/lib", dirname(strdup(argv0)));
+  }
+
+  char *libcpath = format("%s/libc.dll", libdir);
   char *paths[] = {
     libcpath
   };
@@ -641,18 +662,24 @@ static char *find_apphostpath(void) {
   return apphostpath;
 }
 
-static void run_linker(StringArray *inputs, char *output) {
+static void run_linker(char *argv0, StringArray *inputs, char *output) {
+  static char *ldpath = NULL;
+  if (ldpath == NULL) {
+    ldpath = getenv("CHIBILD_CIL_PATH");
+    if (ldpath == NULL)
+      ldpath = "cil-ecma-chibild";
+  }
+
   StringArray arr = {};
 
-  //strarray_push(&arr, "/home/kouji/Projects/chibicc-cil-toolchain/chibild/chibild/bin/Debug/net6.0/cil-chibild");
-  strarray_push(&arr, "cil-chibild");
+  strarray_push(&arr, ldpath);
   strarray_push(&arr, "-o");
   strarray_push(&arr, output);
   strarray_push(&arr, "-m");
   strarray_push(&arr, "net6.0");
 
   char *libpath = find_libpath();
-  char *chibicc_libpath = find_chibicc_libpath();
+  char *chibicc_libpath = find_chibicc_libpath(argv0);
 
   if (opt_shared) {
     strarray_push(&arr, "-shared");
@@ -667,7 +694,7 @@ static void run_linker(StringArray *inputs, char *output) {
     strarray_push(&arr, ld_extra_args.data[i]);
 
   strarray_push(&arr, "-lSystem.Private.CoreLib");
-  strarray_push(&arr, "-lc-bootstrap");
+  strarray_push(&arr, "-lc");
 
   for (int i = 0; i < inputs->len; i++)
     strarray_push(&arr, inputs->data[i]);
@@ -709,6 +736,10 @@ static FileType get_file_type(char *filename) {
 int main(int argc, char **argv) {
   atexit(cleanup);
   init_macros();
+
+  if (getenv("CHIBICC_CIL_DEBUG"))
+    opt_hash_hash_hash = true;
+
   parse_args(argc, argv);
 
   if (opt_cc1) {
@@ -772,9 +803,16 @@ int main(int argc, char **argv) {
     }
 
     // Compile
-    // .NET: chibias always consumes only assembler source code (into .o file.)
-    if (opt_S || opt_c) {
+    if (opt_S) {
       run_cc1(argc, argv, input, output);
+      continue;
+    }
+
+    // Compile and assemble
+    if (opt_c) {
+      char *tmp = create_tmpfile();
+      run_cc1(argc, argv, input, tmp);
+      assemble(tmp, output);
       continue;
     }
 
@@ -788,6 +826,6 @@ int main(int argc, char **argv) {
   }
 
   if (ld_args.len > 0)
-    run_linker(&ld_args, opt_o ? opt_o : "a.out.exe");
+    run_linker(argv[0], &ld_args, opt_o ? opt_o : "a.out.exe");
   return 0;
 }

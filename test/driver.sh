@@ -1,5 +1,10 @@
 #!/bin/bash
 chibicc=$1
+chibiar=$CHIBIAR_CIL_PATH
+if [ $chibiar = "" ]; then
+  chibiar=cil-chibiar
+  #chibiar=/home/kouji/Projects/chibicc-cil-toolchain/chibiar/chibiar/bin/Debug/net6.0/cil-chibiar
+fi
 
 tmp=`mktemp -d /tmp/chibicc-test-XXXXXX`
 trap 'rm -rf $tmp' INT TERM HUP EXIT
@@ -194,8 +199,7 @@ check -E
 # .a file
 echo 'void foo() {}' | $chibicc -c -xc -o $tmp/foo.o -
 echo 'void bar() {}' | $chibicc -c -xc -o $tmp/bar.o -
-cil-chibiar rcs $tmp/foo.a $tmp/foo.o $tmp/bar.o
-#/home/kouji/Projects/chibicc-cil-toolchain/chibiar/chibiar/bin/Debug/net6.0/cil-chibiar rcs $tmp/foo.a $tmp/foo.o $tmp/bar.o
+$chibiar rcs $tmp/foo.a $tmp/foo.o $tmp/bar.o
 echo 'void foo(); void bar(); int main() { foo(); bar(); }' > $tmp/main.c
 $chibicc -o $tmp/foo $tmp/main.c $tmp/foo.a
 check '.a'
