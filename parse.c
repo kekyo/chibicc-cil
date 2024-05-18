@@ -2284,6 +2284,7 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
       mem->ty = basety;
       mem->idx = idx++;
       mem->align = attr.align ? attr.align : mem->ty->align;
+      mem->is_aligning = attr.align != NULL;
       cur = cur->next = mem;
       continue;
     }
@@ -2343,7 +2344,7 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
     ty = struct_type(origin);
     static Node sizem1_node = {ND_NUM, -1};
     ty->size = &sizem1_node;
-    ty->origin_size = &sizem1_node;
+//    ty->origin_size = &sizem1_node;   // AAAA
     push_tag_scope(tag, ty);
     return ty;
   }
@@ -2413,9 +2414,9 @@ static Type *struct_decl(Token **rest, Token *tok) {
   Node *node1 = new_typed_num(1, ty_nuint, NULL);   // (size_t)1
   Node *node8 = new_typed_num(8, ty_nuint, NULL);   // (size_t)8
   Node *bits = node0;
-  Node *origin_bits = node0;
   Node *align = node1;
-  Node *origin_align = node1;
+  bool is_overall_fixed_size = true;
+
   for (Member *mem = ty->members; mem; mem = mem->next) {
     if (mem->is_bitfield) {
       // int sz = mem->ty->size;
@@ -2426,24 +2427,6 @@ static Type *struct_decl(Token **rest, Token *tok) {
         // It affects only alignment.
         bits = align_to_node(bits, sz8);
       else {
-        // origin_bits = (origin_bits / (sz * 8) != (origin_bits + mem->bit_width - 1) / (sz * 8)) ?
-        //    align_to(origin_bits, sz * 8) : origin_bits
-        Node *origin_cond = new_node(ND_COND, NULL);
-        origin_cond->cond = new_binary(ND_NE,
-          new_binary(ND_DIV, origin_bits, sz8, NULL),
-          new_binary(ND_DIV,
-            new_binary(ND_SUB,
-              new_binary(ND_ADD,
-                origin_bits,
-                new_typed_num(mem->bit_width, ty_nuint, NULL),
-                NULL),
-              node1, NULL),
-            sz8, NULL),
-          NULL);
-        origin_cond->then = align_to_node(origin_bits, sz8);
-        origin_cond->els = origin_bits;
-        origin_bits = reduce_node(origin_cond);
-
         // bits = (bits / (sz * 8) != (bits + mem->bit_width - 1) / (sz * 8)) ?
         //    align_to(bits, sz * 8) : bits
         Node *cond = new_node(ND_COND, NULL);
@@ -2462,12 +2445,6 @@ static Type *struct_decl(Token **rest, Token *tok) {
         cond->els = bits;
         bits = reduce_node(cond);
 
-        // mem->origin_offset = align_down(origin_bits / 8, sz);
-        mem->origin_offset = reduce_node(
-          align_down_node(
-            new_binary(ND_DIV, origin_bits, node8, NULL),
-            mem->ty->size));
-
         // mem->offset = align_down(bits / 8, sz);
         mem->offset = reduce_and_cache_disp(
           align_down_node(
@@ -2480,13 +2457,6 @@ static Type *struct_decl(Token **rest, Token *tok) {
             new_binary(ND_MOD, bits, sz8, NULL),
             ty_int));
 
-        // origin_bits += mem->bit_width;
-        origin_bits = reduce_node(
-          new_binary(ND_ADD,
-            origin_bits,
-            new_typed_num(mem->bit_width, ty_nuint, NULL),
-            NULL));
-
         // bits += mem->bit_width;
         bits = reduce_node(
           new_binary(ND_ADD,
@@ -2495,22 +2465,6 @@ static Type *struct_decl(Token **rest, Token *tok) {
             NULL));
       }
     } else {
-      // origin_bits = align_to(origin_bits, mem->ty->align * 8)
-      origin_bits = reduce_node(
-        align_to_node(
-          origin_bits, new_binary(ND_MUL, mem->ty->align, node8, NULL)));
-
-      // mem->origin_offset = origin_bits / 8
-      mem->origin_offset = reduce_node(
-        new_binary(ND_DIV, origin_bits, node8, NULL));
-
-      // origin_bits = origin_bits + mem->ty->size * 8
-      origin_bits = reduce_node(
-        new_binary(ND_ADD,
-          origin_bits,
-          new_binary(ND_MUL, mem->ty->size, node8, NULL),
-          NULL));
-
       // bits = align_to(bits, mem->align * 8)
       bits = reduce_node(
         align_to_node(
@@ -2526,11 +2480,9 @@ static Type *struct_decl(Token **rest, Token *tok) {
           bits,
           new_binary(ND_MUL, mem->ty->size, node8, NULL),
           NULL));
-    }
 
-    // origin_align = max(origin_align, mem->ty->align)
-    origin_align = reduce_node(
-      max_node(origin_align, mem->ty->align));
+      is_overall_fixed_size &= mem->ty->is_fixed_size;
+    }
 
     // align = max(align, mem->align)
     align = reduce_and_cache_disp(
@@ -2538,15 +2490,6 @@ static Type *struct_decl(Token **rest, Token *tok) {
   }
 
   ty->align = align;
-
-  // ty->origin_size = align_to(origin_bits, origin_align * 8) / 8
-  ty->origin_size = reduce_node(
-    new_binary(ND_DIV,
-      align_to_node(
-        origin_bits,
-        new_binary(ND_MUL, origin_align, node8, NULL)),
-        node8,
-        NULL));
 
   // ty->size = align_to(offset, align * 8) / 8
   ty->size = reduce_and_cache_disp(
@@ -2556,6 +2499,8 @@ static Type *struct_decl(Token **rest, Token *tok) {
         new_binary(ND_MUL, align, node8, NULL)),
         node8,
         NULL));
+
+  ty->is_fixed_size = is_overall_fixed_size;
 
   return ty;
 }
@@ -2573,27 +2518,27 @@ static Type *union_decl(Token **rest, Token *tok) {
   Node *node1 = new_typed_num(1, ty_nuint, NULL);   // (size_t)1
   Node *size = node0;
   Node *align = node1;
-  Node *origin_align = node1;
+  bool is_overall_fixed_size = true;
 
   for (Member *mem = ty->members; mem; mem = mem->next) {
     // mem->offset = mem->origin_offset = 0
     mem->offset = node0;
-    mem->origin_offset = node0;
+    //mem->origin_offset = node0;   // AAAA
 
     // align = max(align, mem->align)
     align = reduce_and_cache_disp(max_node(align, mem->align));
-    // origin_align = max(origin_align, mem->ty->align)
-    origin_align = reduce_node(max_node(origin_align, mem->ty->align));
     // size = max(size, mem->ty->size)
     size = reduce_and_cache_disp(max_node(size, mem->ty->size));
+
+    is_overall_fixed_size &= mem->ty->is_fixed_size;
   }
 
   ty->align = reduce_and_cache_disp(align);
 
-  // ty->origin_size = align_to(size, origin_align)
-  ty->origin_size = reduce_node(align_to_node(size, origin_align));
   // ty->size = align_to(size, ty->align)
   ty->size = reduce_and_cache_disp(align_to_node(size, ty->align));
+
+  ty->is_fixed_size = is_overall_fixed_size;
 
   return ty;
 }

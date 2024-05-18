@@ -32,11 +32,11 @@ Type *ty_double = &(Type){TY_DOUBLE};
 
 Type *ty_va_list = &(Type){TY_VA_LIST};
 
-static void init_type(Type *ty, Node *sz, bool is_unsigned) {
+static void init_type(Type *ty, Node *sz, bool is_unsigned, bool is_fixed_size) {
   ty->size = sz;
   ty->align = sz;
-  ty->origin_size = sz;
   ty->is_unsigned = is_unsigned;
+  ty->is_fixed_size = is_fixed_size;
 }
 
 void init_type_system(MemoryModel mm) {
@@ -74,30 +74,30 @@ void init_type_system(MemoryModel mm) {
   sizevalist_node->kind = ND_SIZEOF;
   sizevalist_node->sizeof_ty = ty_va_list;
 
-  init_type(ty_void, size1_node, false);
-  init_type(ty_bool, size1_node, true);
+  init_type(ty_void, size1_node, false, true);
+  init_type(ty_bool, size1_node, true, true);
 
-  init_type(ty_char, size1_node, false);
-  init_type(ty_short, size2_node, false);
-  init_type(ty_int, size4_node, false);
-  init_type(ty_long, size8_node, false);
+  init_type(ty_char, size1_node, false, true);
+  init_type(ty_short, size2_node, false, true);
+  init_type(ty_int, size4_node, false, true);
+  init_type(ty_long, size8_node, false, true);
   
-  init_type(ty_uchar, size1_node, true);
-  init_type(ty_ushort, size2_node, true);
-  init_type(ty_uint, size4_node, true);
-  init_type(ty_ulong, size8_node, true);
+  init_type(ty_uchar, size1_node, true, true);
+  init_type(ty_ushort, size2_node, true, true);
+  init_type(ty_uint, size4_node, true, true);
+  init_type(ty_ulong, size8_node, true, true);
 
-  init_type(ty_nint, sizenint_node, false);
-  init_type(ty_nuint, sizenuint_node, true);
+  bool is_pointer_fixed_size = mem_model != AnyCPU;
+  init_type(ty_nint, sizenint_node, false, is_pointer_fixed_size);
+  init_type(ty_nuint, sizenuint_node, true, is_pointer_fixed_size);
 
-  init_type(ty_float, size4_node, false);
-  init_type(ty_double, size8_node, false);
+  init_type(ty_float, size4_node, false, true);
+  init_type(ty_double, size8_node, false, true);
 
-  init_type(ty_va_list, sizenuint_node, true);
+  init_type(ty_va_list, sizenuint_node, true, false);
 
   ty_va_list->size = sizevalist_node;
   ty_va_list->align = size8_node;
-  ty_va_list->origin_size = sizevalist_node;
 }
 
 static Type *new_type(TypeKind kind) {
@@ -182,10 +182,12 @@ Type *pointer_to(Type *base, Token *tok) {
   case M32:
     ty->size = new_typed_num(4, ty_nint, tok);
     ty->align = ty->size;
+    ty->is_fixed_size = true;
     break;
   case M64:
     ty->size = new_typed_num(8, ty_nint, tok);
     ty->align = ty->size;
+    ty->is_fixed_size = true;
     break;
   default:
     ty->size = new_sizeof(ty, tok);
@@ -202,6 +204,7 @@ Type *func_type(Type *return_ty, Token *tok) {
   ty->size = size1_node;
   ty->return_ty = return_ty;
   ty->tok = tok;
+  ty->is_fixed_size = true;
   return ty;
 }
 
@@ -212,6 +215,7 @@ Type *array_of(Type *base, int len, Token *tok) {
   ty->align = base->align;
   ty->size = new_sizeof(ty, NULL);
   ty->tok = tok;
+  ty->is_fixed_size = base->is_fixed_size;
   return ty;
 }
 

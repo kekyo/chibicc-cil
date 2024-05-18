@@ -1318,6 +1318,7 @@ static void emit_type(Obj *prog) {
         Node *last_size = &zero;
         int bit_index = 0;
         int bit_width = 0;
+        bool is_continued_fixed_size = true;
         for (Member *mem = ty->members; mem; mem = mem->next) {
           if (mem->is_bitfield) {
             bit_width += mem->bit_width;
@@ -1330,52 +1331,56 @@ static void emit_type(Obj *prog) {
               println("  public uint8 __bitfield%d", bit_index++);
               bit_width = 0;
             }
-            // Exactly equals both offsets.
-            if (equals_node(get_var_interior(mem->offset), mem->origin_offset))
+            // Is this members continued fixed types? 
+            if (is_continued_fixed_size)
               println("  public %s %s", safe_to_cil_typename(mem->ty), get_member_name(mem));
             // Couldn't adjust with padding when offset/size is not concrete.
             // (Because mem->offset and ty->size are reduced.)
-            else if (get_var_interior(mem->offset)->kind != ND_NUM || last_size->kind != ND_NUM)
+            else if (mem->is_aligning && !is_continued_fixed_size)
               error_tok(mem->name, "Could not adjust on alignment this member.");
             // (Assertion for concrete numeric value.)
-            else if (last_offset->kind == ND_NUM) {
-              int64_t pad_start = last_offset->val + last_size->val;
-              int64_t pad_size = get_var_interior(mem->offset)->val - pad_start;
-              if (pad_size >= 1)
-                println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
+            else {
+              if (last_offset->kind == ND_NUM) {
+                int64_t pad_start = last_offset->val + last_size->val;
+                int64_t pad_size = get_var_interior(mem->offset)->val - pad_start;
+                if (pad_size >= 1)
+                  println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
+              }
               println("  public %s %s", safe_to_cil_typename(mem->ty), get_member_name(mem));
-            } else
-              unreachable();
+            }
           }
           last_offset = get_var_interior(mem->offset);
           last_size = get_var_interior(mem->ty->size);
+          is_continued_fixed_size &= mem->ty->is_fixed_size;
         }
         // Not equals both sizes.
-        if (!equals_node(get_var_interior(ty->size), ty->origin_size)) {
-          if (get_var_interior(ty->size)->kind != ND_NUM || last_size->kind != ND_NUM)
-            error_tok(ty->name, "Could not adjust on alignment this type.");
-          else if (last_offset->kind == ND_NUM) {
+        if (!is_continued_fixed_size) {
+          if (last_offset->kind == ND_NUM) {
             int64_t pad_start = last_offset->val + last_size->val;
             int64_t pad_size = get_var_interior(ty->size)->val - pad_start;
             if (pad_size >= 1)
               println("  internal uint8[%ld] $pad_$%ld", pad_size, pad_start);
-          } else
-            unreachable();
+          }
         }
         break;
       }
-      case TY_UNION:
+      case TY_UNION: {
         println(".structure %s %s explicit", ty_scope, to_cil_typename(ty));
-        for (Member *mem = ty->members; mem; mem = mem->next)
+        bool is_continued_fixed_size = true;
+        for (Member *mem = ty->members; mem; mem = mem->next) {
           println("  public %s %s 0", safe_to_cil_typename(mem->ty), get_member_name(mem));
+          is_continued_fixed_size &= mem->ty->is_fixed_size;
+        }
         // Not equals both sizes.
-        if (!equals_node(get_var_interior(ty->size), ty->origin_size)) {
-          if (get_var_interior(ty->size)->kind != ND_NUM)
-            error_tok(ty->name, "Could not adjust on alignment this type.");
-          else if (get_var_interior(ty->size)->val >= 1)
-            println("  internal uint8[%ld] $pad_$0 0", get_var_interior(ty->size)->val);
+        if (!is_continued_fixed_size) {
+          Node *size = get_var_interior(ty->size);
+          if (size->kind == ND_NUM) {
+            if (size->val >= 1)
+              println("  internal uint8[%ld] $pad_$0 0", size->val);
+          }
         }
         break;
+      }
     }
     using_type = using_type->next;
   }

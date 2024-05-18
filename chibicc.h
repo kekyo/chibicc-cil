@@ -366,8 +366,9 @@ struct Type {
   TypeKind kind;
   Node *size;         // sizeof() value
   Node *align;        // alignment
-  Node *origin_size;
+//  Node *origin_size;   // AAAA
   bool is_unsigned;   // unsigned or signed
+  bool is_fixed_size;
   Token *tok;
   Type *origin;       // for type compatibility check
 
@@ -427,7 +428,8 @@ struct Member {
   int idx;
   Node *align;
   Node *offset;
-  Node *origin_offset;
+//  Node *origin_offset;   // AAAA
+  bool is_aligning;
 
   // Bitfield
   bool is_bitfield;
