@@ -344,6 +344,11 @@ static void parse_args(int argc, char **argv) {
         !strcmp(argv[i], "-fno-strict-aliasing") ||
         !strcmp(argv[i], "-fcommon") ||
         !strcmp(argv[i], "-fno-common") ||
+        !strcmp(argv[i], "-fbuiltin") ||
+        !strcmp(argv[i], "-fno-builtin") ||
+        !strcmp(argv[i], "-fmath-errno") ||
+        !strcmp(argv[i], "-fno-math-errno") ||
+        !strcmp(argv[i], "-fno-tree-loop-distribute-patterns") ||
         !strcmp(argv[i], "-m64") ||
         !strcmp(argv[i], "-m32") ||
         !strcmp(argv[i], "-mno-red-zone") ||
