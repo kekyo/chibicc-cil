@@ -1125,6 +1125,7 @@ void init_macros(void) {
   define_macro("unix", "1");
   define_macro("_POSIX_THREADS", "1");
   define_macro("__extension__", "");
+  define_macro("__builtin_expect", "");
 
   add_builtin("__FILE__", file_macro);
   add_builtin("__LINE__", line_macro);
