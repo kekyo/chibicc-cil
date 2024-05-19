@@ -2954,7 +2954,7 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
 
   Obj *fn = new_gvar(get_ident(ty->name), ty);
   fn->is_function = true;
-  fn->is_definition = !consume(&tok, tok, ";");
+  fn->is_definition = !(consume(&tok, tok, ";") || consume(&tok, tok, ","));
   fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
   fn->is_inline = attr->is_inline;
   fn->is_root = !(fn->is_static && fn->is_inline);
