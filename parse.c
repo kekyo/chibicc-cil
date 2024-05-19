@@ -2896,8 +2896,9 @@ static void create_param_lvars(Type *param) {
   if (param) {
     create_param_lvars(param->next);
     if (!param->name)
-      error_tok(param->name_pos, "parameter name omitted");
-    new_param_lvar(get_ident(param->name), param);
+      new_param_lvar(new_unique_name("param"), param);
+    else
+      new_param_lvar(get_ident(param->name), param);
   }
 }
 
