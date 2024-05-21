@@ -173,7 +173,7 @@ static bool is_keyword(Token *tok) {
       "__builtin_nint", "__builtin_nuint",
       "const", "volatile", "auto", "register", "restrict",
       "__restrict", "__restrict__", "_Noreturn", "float", "double",
-      "typeof", "asm", "_Thread_local", "__thread",
+      "typeof", "asm", "_Thread_local", "__thread", "_Complex",
     };
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
@@ -439,16 +439,29 @@ static void convert_pp_number(Token *tok) {
   char *end;
   double val = strtod(tok->loc, &end);
 
+  // HACK: It would be incorrect to specify the imaginary suffix first,
+  // but we have made it possible to recognize either.
+  bool is_imaginary = false;
+  if (*end == 'i' || *end == 'I') {
+    is_imaginary = true;
+    end++;
+  }  
+
   Type *ty;
   if (*end == 'f' || *end == 'F') {
-    ty = ty_float;
+    ty = is_imaginary ? ty_float_complex : ty_float;
     end++;
   } else if (*end == 'l' || *end == 'L') {
-    ty = ty_double;
+    ty = is_imaginary ? ty_double_complex : ty_double;
     end++;
   } else {
-    ty = ty_double;
+    ty = is_imaginary ? ty_double_complex : ty_double;
   }
+
+  if (!is_imaginary && (*end == 'i' || *end == 'I')) {
+    ty = ty->kind == TY_FLOAT ? ty_float_complex : ty_double_complex;
+    end++;
+  }  
 
   if (tok->loc + tok->len != end)
     error_tok(tok, "invalid numeric constant");

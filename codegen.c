@@ -264,6 +264,8 @@ static void load(Type *ty) {
     case TY_STRUCT:
     case TY_UNION:
     case TY_VA_LIST:
+    case TY_FLOAT_COMPLEX:
+    case TY_DOUBLE_COMPLEX:
       println("  ldobj %s", to_cil_typename(ty));
       return;
     case TY_BOOL:
@@ -308,6 +310,8 @@ static void store(Type *ty) {
     case TY_STRUCT:
     case TY_UNION:
     case TY_VA_LIST:
+    case TY_FLOAT_COMPLEX:
+    case TY_DOUBLE_COMPLEX:
       println("  stobj %s", to_cil_typename(ty));
       return;
     case TY_NINT:
@@ -356,6 +360,108 @@ static void cmp_zero(Type *ty) {
       break;
   }
   println("  ceq");
+}
+
+static void gen_const_integer(Type *ty, long val) {
+  switch (ty->kind) {
+    case TY_BOOL:
+      println("  ldc.i4.%d", val ? 1 : 0);
+      return;
+    case TY_CHAR:
+    case TY_SHORT:
+    case TY_INT:
+    case TY_ENUM: {
+      int32_t i32 = (int32_t)val;
+      if (i32 > INT8_MAX || i32 < INT8_MIN)
+        println("  ldc.i4 %d", i32);
+      else if (i32 > 8 || i32 < -1)
+        println("  ldc.i4.s %d", i32);
+      else if (i32 == -1)
+        println("  ldc.i4.m1");
+      else
+        println("  ldc.i4.%d", i32);
+      return;
+    }
+    case TY_LONG: {
+      if (val > INT32_MAX || val < INT32_MIN) {
+        println("  ldc.i8 %ld", val);
+      } else if (val > INT8_MAX || val < INT8_MIN) {
+        println("  ldc.i4 %ld", val);
+        println("  conv.i8");
+      } else if (val > 8 || val < -1) {
+        println("  ldc.i4.s %ld", val);
+        println("  conv.i8");
+      } else if (val == -1) {
+        println("  ldc.i4.m1");
+        println("  conv.i8");
+      } else {
+        println("  ldc.i4.%ld", val);
+        println("  conv.i8");
+      }
+      return;
+    }
+    case TY_NINT:
+    case TY_PTR: {
+      if (val > INT32_MAX || val < INT32_MIN)
+        println("  ldc.i8 %ld", val);
+      else if (val > INT8_MAX || val < INT8_MIN)
+        println("  ldc.i4 %ld", val);
+      else if (val > 8 || val < -1)
+        println("  ldc.i4.s %ld", val);
+      else if (val == -1)
+        println("  ldc.i4.m1");
+      else
+        println("  ldc.i4.%ld", val);
+      println("  conv.i");
+      return;
+    }
+  }
+  unreachable();
+}
+
+static void gen_const_float(Type *ty, double fval) {
+  switch (ty->kind) {
+    case TY_FLOAT: {
+      float f = (float)fval;
+      if (f > INT8_MAX || f < INT8_MIN)
+        println("  ldc.r4 %f", f);
+      else {
+        int i = (int)f;
+        if (i != f)
+          println("  ldc.r4 %f", f);
+        else {
+          if (i > 8 || i < -1)
+            println("  ldc.i4.s %d", i);
+          else if (i == -1)
+            println("  ldc.i4.m1");
+          else
+            println("  ldc.i4.%d", i);
+          println("  conv.r4");
+        }
+      }
+      return;
+    }
+    case TY_DOUBLE: {
+      if (fval > INT8_MAX || fval < INT8_MIN)
+        println("  ldc.r8 %f", fval);
+      else {
+        int i = (int)fval;
+        if (i != fval)
+          println("  ldc.r8 %f", fval);
+        else {
+          if (i > 8 || i < -1)
+            println("  ldc.i4.s %d", i);
+          else if (i == -1)
+            println("  ldc.i4.m1");
+          else
+            println("  ldc.i4.%d", i);
+          println("  conv.r8");
+        }
+      }
+      return;
+    }
+  }
+  unreachable();
 }
 
 typedef enum { I8, I16, I32, I64, NINT, U8, U16, U32, U64, NUINT, F32, F64 } TypeId;
@@ -428,6 +534,30 @@ static void cast(Type *from, Type *to) {
     cmp_zero(from);
     println("  ldc.i4.0");
     println("  ceq");
+    return;
+  }
+
+  if (to->kind == TY_FLOAT_COMPLEX) {
+    cast(from, ty_float);             // real
+    gen_const_float(ty_float, 0.0);   // imag
+    println("  call __CMPLXF");
+    return;
+  }
+  if (to->kind == TY_DOUBLE_COMPLEX) {
+    cast(from, ty_double);            // real
+    gen_const_float(ty_double, 0.0);  // imag
+    println("  call __CMPLX");
+    return;
+  }
+
+  if (from->kind == TY_FLOAT_COMPLEX) {
+    println("  call crealf");
+    cast(ty_float, to);
+    return;
+  }
+  if (from->kind == TY_DOUBLE_COMPLEX) {
+    println("  call creal");
+    cast(ty_double, to);
     return;
   }
 
@@ -626,63 +756,6 @@ static void gen_sizeof(Type *ty, bool is_bottom) {
   aggregate_type(ty);
 }
 
-static void gen_const_integer(Type *ty, long val) {
-  switch (ty->kind) {
-    case TY_BOOL:
-      println("  ldc.i4.%d", val ? 1 : 0);
-      return;
-    case TY_CHAR:
-    case TY_SHORT:
-    case TY_INT:
-    case TY_ENUM: {
-      int32_t i32 = (int32_t)val;
-      if (i32 > INT8_MAX || i32 < INT8_MIN)
-        println("  ldc.i4 %d", i32);
-      else if (i32 > 8 || i32 < -1)
-        println("  ldc.i4.s %d", i32);
-      else if (i32 == -1)
-        println("  ldc.i4.m1");
-      else
-        println("  ldc.i4.%d", i32);
-      return;
-    }
-    case TY_LONG: {
-      if (val > INT32_MAX || val < INT32_MIN) {
-        println("  ldc.i8 %ld", val);
-      } else if (val > INT8_MAX || val < INT8_MIN) {
-        println("  ldc.i4 %ld", val);
-        println("  conv.i8");
-      } else if (val > 8 || val < -1) {
-        println("  ldc.i4.s %ld", val);
-        println("  conv.i8");
-      } else if (val == -1) {
-        println("  ldc.i4.m1");
-        println("  conv.i8");
-      } else {
-        println("  ldc.i4.%ld", val);
-        println("  conv.i8");
-      }
-      return;
-    }
-    case TY_NINT:
-    case TY_PTR: {
-      if (val > INT32_MAX || val < INT32_MIN)
-        println("  ldc.i8 %ld", val);
-      else if (val > INT8_MAX || val < INT8_MIN)
-        println("  ldc.i4 %ld", val);
-      else if (val > 8 || val < -1)
-        println("  ldc.i4.s %ld", val);
-      else if (val == -1)
-        println("  ldc.i4.m1");
-      else
-        println("  ldc.i4.%ld", val);
-      println("  conv.i");
-      return;
-    }
-  }
-  unreachable();
-}
-
 static void gen_location(Node *node) {
   if (node->tok && node->tok->line_no)
     println("  .location %d %d %d %d %d",
@@ -714,14 +787,29 @@ static void gen_expr(Node *node, bool is_bottom, bool will_discard) {
           gen_const_integer(node->ty, node->val);
           return;
         case TY_FLOAT:
-          println("  ldc.r4 %f", (float)node->fval);
-          return;
         case TY_DOUBLE:
-          println("  ldc.r8 %f", node->fval);
+          gen_const_float(node->ty, node->fval);
           return;
       }
       unreachable();
     }
+    return;
+  case ND_COMPLEX:
+    switch (node->ty->kind) {
+      case TY_FLOAT_COMPLEX:
+        gen_expr(node->lhs, is_bottom, will_discard);
+        gen_expr(node->rhs, is_bottom, will_discard);
+        if (!will_discard)
+          println("  call __CMPLXF");
+        return;
+      case TY_DOUBLE_COMPLEX:
+        gen_expr(node->lhs, is_bottom, will_discard);
+        gen_expr(node->rhs, is_bottom, will_discard);
+        if (!will_discard)
+          println("  call __CMPLX");
+        return;
+    }
+    unreachable();
     return;
   case ND_NEG:
     gen_expr(node->lhs, is_bottom, will_discard);
@@ -994,16 +1082,35 @@ static void gen_expr(Node *node, bool is_bottom, bool will_discard) {
 
   switch (node->kind) {
   case ND_ADD:
-    println("  add");
+    if (node->ty->kind == TY_FLOAT_COMPLEX)
+      println("  call __caddf");
+    else if (node->ty->kind == TY_DOUBLE_COMPLEX)
+      println("  call __cadd");
+    else
+      println("  add");
     return;
   case ND_SUB:
-    println("  sub");
+    if (node->ty->kind == TY_FLOAT_COMPLEX)
+      println("  call __csubf");
+    else if (node->ty->kind == TY_DOUBLE_COMPLEX)
+      println("  call __csub");
+    else
+      println("  sub");
     return;
   case ND_MUL:
-    println("  mul");
+    if (node->ty->kind == TY_FLOAT_COMPLEX)
+      println("  call __cmulf");
+    else if (node->ty->kind == TY_DOUBLE_COMPLEX)
+      println("  call __cmul");
+    else
+      println("  mul");
     return;
   case ND_DIV:
-    if (node->ty->is_unsigned)
+    if (node->ty->kind == TY_FLOAT_COMPLEX)
+      println("  call __cdivf");
+    else if (node->ty->kind == TY_DOUBLE_COMPLEX)
+      println("  call __cdiv");
+    else if (node->ty->is_unsigned)
       println("  div.un");
     else
       println("  div");
@@ -1089,7 +1196,9 @@ static void gen_dummy_value(Type *ty) {
     return;
   case TY_STRUCT:
   case TY_UNION:
-  case TY_VA_LIST: {
+  case TY_VA_LIST:
+  case TY_FLOAT_COMPLEX:
+  case TY_DOUBLE_COMPLEX: {
     const char *type_name = to_cil_typename(ty);
     println("  sizeof %s", type_name);
     println("  localloc");

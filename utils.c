@@ -53,6 +53,10 @@ char *to_cil_typename(Type *ty) {
       return "float32";
     case TY_DOUBLE:
       return "float64";
+    case TY_FLOAT_COMPLEX:
+      return "_FloatComplex";
+    case TY_DOUBLE_COMPLEX:
+      return "_DoubleComplex";
     case TY_VA_LIST:
       return "va_list";
   }
@@ -196,6 +200,7 @@ bool equals_node(Node *lhs, Node *rhs) {
     case ND_LOGOR:
     case ND_COMMA:
     case ND_ASSIGN:
+    case ND_COMPLEX:
       return
         equals_node(lhs->lhs, rhs->lhs) &&
         equals_node(lhs->rhs, rhs->rhs);
@@ -252,6 +257,7 @@ static bool is_immutable(Node *node) {
     case ND_LOGOR:
     case ND_COMMA:
     case ND_ASSIGN:
+    case ND_COMPLEX:
       return is_immutable(node->lhs) && is_immutable(node->rhs);
     case ND_NEG:
     case ND_NOT:
@@ -364,10 +370,6 @@ static bool is_integer_not_equals(Node *node, int64_t val) {
 static bool is_flonum_equals(Node *node, double fval) {
   return node->kind == ND_NUM && is_flonum(node->ty) && node->fval == fval;
 }
-
-//static bool is_flonum_not_equals(Node *node, double fval) {
-//  return node->kind == ND_NUM && is_flonum(node->ty) && node->fval != fval;
-//}
 
 static Node *reduce_(Node *node) {
   Node *lhs;
@@ -612,6 +614,10 @@ static Node *reduce_(Node *node) {
   case ND_MEMZERO:
   case ND_NULL_EXPR:
     return node;
+  case ND_COMPLEX:
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    return new_binary(ND_COMPLEX, lhs, rhs, node->tok);
   default:
     unreachable();
   }

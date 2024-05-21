@@ -7,6 +7,7 @@ static Node *size1_node = &(Node){ND_NUM, 1};
 static Node *size2_node = &(Node){ND_NUM, 2};
 static Node *size4_node = &(Node){ND_NUM, 4};
 static Node *size8_node = &(Node){ND_NUM, 8};
+static Node *size16_node = &(Node){ND_NUM, 16};
 static Node *sizenint_node = &(Node){ND_SIZEOF, 0};
 static Node *sizenuint_node = &(Node){ND_SIZEOF, 0};
 static Node *sizevalist_node = &(Node){ND_SIZEOF, 0};
@@ -29,6 +30,8 @@ Type *ty_nuint = &(Type){TY_NINT};
 
 Type *ty_float = &(Type){TY_FLOAT};
 Type *ty_double = &(Type){TY_DOUBLE};
+Type *ty_float_complex = &(Type){TY_FLOAT_COMPLEX};
+Type *ty_double_complex = &(Type){TY_DOUBLE_COMPLEX};
 
 Type *ty_va_list = &(Type){TY_VA_LIST};
 
@@ -47,6 +50,7 @@ void init_type_system(MemoryModel mm) {
   size2_node->ty = ty_nuint;
   size4_node->ty = ty_nuint;
   size8_node->ty = ty_nuint;
+  size16_node->ty = ty_nuint;
 
   switch (mem_model) {
   case M32:
@@ -93,6 +97,8 @@ void init_type_system(MemoryModel mm) {
 
   init_type(ty_float, size4_node, false, true);
   init_type(ty_double, size8_node, false, true);
+  init_type(ty_float_complex, size8_node, false, true);
+  init_type(ty_double_complex, size16_node, false, true);
 
   init_type(ty_va_list, sizenuint_node, true, false);
 
@@ -116,8 +122,12 @@ bool is_flonum(Type *ty) {
   return ty->kind == TY_FLOAT || ty->kind == TY_DOUBLE;
 }
 
+bool is_complex(Type *ty) {
+  return ty->kind == TY_FLOAT_COMPLEX || ty->kind == TY_DOUBLE_COMPLEX;
+}
+
 bool is_numeric(Type *ty) {
-  return is_integer(ty) || is_flonum(ty);
+  return is_integer(ty) || is_flonum(ty) || is_complex(ty);
 }
 
 bool is_compatible(Type *t1, Type *t2) {
@@ -142,6 +152,8 @@ bool is_compatible(Type *t1, Type *t2) {
     return t1->is_unsigned == t2->is_unsigned;
   case TY_FLOAT:
   case TY_DOUBLE:
+  case TY_FLOAT_COMPLEX:
+  case TY_DOUBLE_COMPLEX:
     return true;
   case TY_PTR:
     return is_compatible(t1->base, t2->base);
@@ -264,6 +276,11 @@ static Type *get_common_type(Type *ty1, Type *ty2, Token *tok) {
   if (ty2->kind == TY_FUNC)
     return pointer_to(ty2, tok);
 
+  if (ty1->kind == TY_DOUBLE_COMPLEX || ty2->kind == TY_DOUBLE_COMPLEX)
+    return ty_double_complex;
+  if (ty1->kind == TY_FLOAT_COMPLEX || ty2->kind == TY_FLOAT_COMPLEX)
+    return ty_float_complex;
+
   if (ty1->kind == TY_DOUBLE || ty2->kind == TY_DOUBLE)
     return ty_double;
   if (ty1->kind == TY_FLOAT || ty2->kind == TY_FLOAT)
@@ -321,6 +338,9 @@ void add_type(Node *node) {
   case ND_NUM:
     node->ty = ty_int;
     return;
+  case ND_COMPLEX:
+    node->ty = ty_double_complex;
+    return;
   case ND_ADD:
   case ND_SUB:
   case ND_MUL:
@@ -353,7 +373,7 @@ void add_type(Node *node) {
     node->ty = ty_int;
     return;
   case ND_FUNCALL:
-    node->ty = ty_int;
+    node->ty = node->func_ty->return_ty;
     return;
   case ND_NOT:
   case ND_LOGOR:

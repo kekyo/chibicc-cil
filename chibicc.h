@@ -258,6 +258,7 @@ typedef enum {
   ND_STMT_EXPR, // Statement expression
   ND_VAR,       // Variable
   ND_NUM,       // Integer
+  ND_COMPLEX,   // Constant complex number
   ND_CAST,      // Type cast
   ND_MEMZERO,   // Zero-clear a stack variable
   ND_ASM,       // "asm"
@@ -353,6 +354,8 @@ typedef enum {
   TY_NINT,
   TY_FLOAT,
   TY_DOUBLE,
+  TY_FLOAT_COMPLEX,
+  TY_DOUBLE_COMPLEX,
   TY_ENUM,
   TY_PTR,
   TY_FUNC,
@@ -455,6 +458,8 @@ extern Type *ty_nuint;
 
 extern Type *ty_float;
 extern Type *ty_double;
+extern Type *ty_float_complex;
+extern Type *ty_double_complex;
 
 extern Type *ty_va_list;
 
@@ -470,6 +475,7 @@ void init_type_system(MemoryModel mm);
 
 bool is_integer(Type *ty);
 bool is_flonum(Type *ty);
+bool is_complex(Type *ty);
 bool is_numeric(Type *ty);
 bool is_compatible(Type *t1, Type *t2);
 Type *copy_type(Type *ty);

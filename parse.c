@@ -207,6 +207,14 @@ Node *new_typed_num(int64_t val, Type *ty, Token *tok) {
   return node;
 }
 
+Node *new_complex(Node *real, Node *imag, Type *ty, Token *tok) {
+  Node *node = new_node(ND_COMPLEX, tok);
+  node->lhs = real;
+  node->rhs = imag;
+  node->ty = ty;
+  return node;
+}
+
 Node *new_sizeof(Type *ty, Token *tok) {
   Node *node = new_node(ND_SIZEOF, tok);
   node->sizeof_ty = ty;
@@ -392,9 +400,10 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     LONG     = 1 << 10,
     FLOAT    = 1 << 12,
     DOUBLE   = 1 << 14,
-    OTHER    = 1 << 16,
-    SIGNED   = 1 << 17,
-    UNSIGNED = 1 << 18,
+    COMPLEX  = 1 << 16,
+    OTHER    = 1 << 18,
+    SIGNED   = 1 << 19,
+    UNSIGNED = 1 << 20,
   };
 
   Type *ty = ty_int;
@@ -511,6 +520,8 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
       counter += FLOAT;
     else if (equal(tok, "double"))
       counter += DOUBLE;
+    else if (equal(tok, "_Complex"))
+      counter += COMPLEX;
     else if (equal(tok, "signed"))
       counter |= SIGNED;
     else if (equal(tok, "unsigned"))
@@ -573,6 +584,13 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     case DOUBLE:
     case LONG + DOUBLE:
       ty = ty_double;
+      break;
+    case FLOAT + COMPLEX:
+      ty = ty_float_complex;
+      break;
+    case DOUBLE + COMPLEX:
+    case LONG + DOUBLE + COMPLEX:
+      ty = ty_double_complex;
       break;
     default:
       error_tok(tok, "invalid type");
@@ -1380,7 +1398,7 @@ static bool is_typename(Token *tok) {
       "__builtin_nint", "__builtin_nuint",
       "const", "volatile", "auto", "register", "restrict", "__restrict",
       "__restrict__", "_Noreturn", "float", "double", "typeof", "inline",
-      "_Thread_local", "__thread",
+      "_Thread_local", "__thread", "_Complex",
     };
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
@@ -2830,6 +2848,24 @@ static Node *primary(Token **rest, Token *tok) {
     return new_num(is_compatible(t1, t2), start);
   }
 
+  if (equal(tok, "__builtin_complex")) {
+    tok = skip(tok->next, "(");
+    Node *real_arg = assign(&tok, tok);
+    add_type(real_arg);
+    tok = skip(tok, ",");
+    Node *imag_arg = assign(&tok, tok);
+    add_type(imag_arg);
+
+    if (real_arg->ty->kind != imag_arg->ty->kind || !is_flonum(real_arg->ty)) {
+      error_tok(tok, "invalid type combination on complex constructor");
+    }
+
+    *rest = skip(tok, ")");
+
+    return new_complex(real_arg, imag_arg,
+      real_arg->ty->kind == TY_FLOAT ? ty_float_complex : ty_double_complex, tok);
+  }
+
   if (tok->kind == TK_IDENT) {
     // Variable or enum constant
     VarScope *sc = find_var(tok);
@@ -2865,7 +2901,17 @@ static Node *primary(Token **rest, Token *tok) {
     Node *node;
     if (is_flonum(tok->ty))
       node = new_flonum(tok->fval, tok->ty, tok);
-    else
+    else if (tok->ty->kind == TY_FLOAT_COMPLEX) {
+      node = new_complex(
+        new_flonum(0.0f, ty_float, NULL),
+        new_flonum((float)tok->fval, ty_float, NULL),
+        tok->ty, tok);
+    } else if (tok->ty->kind == TY_DOUBLE_COMPLEX) {
+      node = new_complex(
+        new_flonum(0.0, ty_double, NULL),
+        new_flonum(tok->fval, ty_double, NULL),
+        tok->ty, tok);
+    } else
       node = new_typed_num(tok->val, tok->ty, tok);
 
     *rest = tok->next;
