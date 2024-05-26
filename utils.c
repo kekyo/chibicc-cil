@@ -47,7 +47,7 @@ char *to_cil_typename(Type *ty) {
       return ty->is_unsigned ? "uint32" : "int32";
     case TY_LONG:
       return ty->is_unsigned ? "uint64" : "int64";
-    case TY_NINT:
+    case TY_INTPTR:
       return ty->is_unsigned ? "nuint" : "nint";
     case TY_FLOAT:
       return "float32";
@@ -132,7 +132,7 @@ bool equals_type(Type *lhs, Type *rhs) {
     case TY_SHORT:
     case TY_INT:
     case TY_LONG:
-    case TY_NINT:
+    case TY_INTPTR:
       return lhs->is_unsigned == rhs->is_unsigned;
     case TY_FLOAT:
     case TY_DOUBLE:
@@ -295,7 +295,7 @@ int64_t get_by_integer(Node *node) {
     return (int32_t)node->val;
   case TY_LONG:
     return node->ty->is_unsigned ? (uint64_t)node->val : node->val;
-  case TY_NINT:
+  case TY_INTPTR:
   case TY_PTR:
     return node->ty->is_unsigned ? (uint64_t)(void *)node->val : (int64_t)(void *)node->val;
   case TY_FLOAT:
@@ -320,7 +320,7 @@ static double get_by_flonum(Node *node) {
     return (int32_t)node->val;
   case TY_LONG:
     return node->ty->is_unsigned ? (uint64_t)node->val : node->val;
-  case TY_NINT:
+  case TY_INTPTR:
   case TY_PTR:
     return node->ty->is_unsigned ? (uint64_t)(void *)node->val : (int64_t)(void *)node->val;
   case TY_FLOAT:
@@ -340,7 +340,7 @@ static Node *cast_type(Node *node, Type *ty) {
     case TY_INT:
     case TY_ENUM:
     case TY_LONG:
-    case TY_NINT:
+    case TY_INTPTR:
     case TY_PTR:
       return new_typed_num(get_by_integer(node), ty, node->tok);
     case TY_FLOAT:

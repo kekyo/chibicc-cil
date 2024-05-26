@@ -132,7 +132,7 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr);
 static Token *global_variable(Token *tok, Type *basety, VarAttr *attr);
 
 static Node *align_down_node(Node *n, Node *align) {
-  return align_to_node(new_add(new_sub(n, align, n->tok), new_typed_num(1, ty_nuint, n->tok), n->tok), align);
+  return align_to_node(new_add(new_sub(n, align, n->tok), new_typed_num(1, ty_uintptr, n->tok), n->tok), align);
 }
 
 static void enter_scope(void) {
@@ -218,7 +218,7 @@ Node *new_complex(Node *real, Node *imag, Type *ty, Token *tok) {
 Node *new_sizeof(Type *ty, Token *tok) {
   Node *node = new_node(ND_SIZEOF, tok);
   node->sizeof_ty = ty;
-  node->ty = ty_nuint;    // size_t
+  node->ty = ty_uintptr;    // size_t
   return node;
 }
 
@@ -366,7 +366,7 @@ static void push_tag_scope(Token *tok, Type *ty) {
 }
 
 // declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
-//             | "__builtin_nint" | "__builtin_nuint" | "__builtin_va_list"
+//             | "__builtin_intptr" | "__builtin_uintptr" | "__builtin_va_list"
 //             | "typedef" | "static" | "extern" | "inline"
 //             | "_Thread_local" | "__thread"
 //             | "signed" | "unsigned"
@@ -455,18 +455,18 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
       continue;
     }
 
-    if (equal(tok, "__builtin_nint")) {
+    if (equal(tok, "__builtin_intptr")) {
       if (counter)
         break;
-      ty = ty_nint;
+      ty = ty_intptr;
       tok = tok->next;
       break;
     }
 
-    if (equal(tok, "__builtin_nuint")) {
+    if (equal(tok, "__builtin_uintptr")) {
       if (counter)
         break;
-      ty = ty_nuint;
+      ty = ty_uintptr;
       tok = tok->next;
       break;
     }
@@ -1395,7 +1395,7 @@ static bool is_typename(Token *tok) {
     static char *kw[] = {
       "void", "_Bool", "char", "short", "int", "long", "struct", "union",
       "typedef", "enum", "static", "extern", "_Alignas", "__builtin_va_list", "signed", "unsigned",
-      "__builtin_nint", "__builtin_nuint",
+      "__builtin_intptr", "__builtin_uintptr",
       "const", "volatile", "auto", "register", "restrict", "__restrict",
       "__restrict__", "_Noreturn", "float", "double", "typeof", "inline",
       "_Thread_local", "__thread", "_Complex",
@@ -2162,7 +2162,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node = new_binary(ND_DIV, node, lhs->ty->base->size, tok);
     add_type(node);
-    node->ty = ty_nint;   // Forced ptrdiff_t
+    node->ty = ty_intptr;   // Forced ptrdiff_t
     return node;
   }
 
@@ -2428,9 +2428,9 @@ static Type *struct_decl(Token **rest, Token *tok) {
     return ty;
 
   // Assign offsets within the struct to members.
-  Node *node0 = new_typed_num(0, ty_nuint, NULL);   // (size_t)0
-  Node *node1 = new_typed_num(1, ty_nuint, NULL);   // (size_t)1
-  Node *node8 = new_typed_num(8, ty_nuint, NULL);   // (size_t)8
+  Node *node0 = new_typed_num(0, ty_uintptr, NULL);   // (size_t)0
+  Node *node1 = new_typed_num(1, ty_uintptr, NULL);   // (size_t)1
+  Node *node8 = new_typed_num(8, ty_uintptr, NULL);   // (size_t)8
   Node *bits = node0;
   Node *align = node1;
   bool is_overall_fixed_size = true;
@@ -2454,7 +2454,7 @@ static Type *struct_decl(Token **rest, Token *tok) {
             new_binary(ND_SUB,
               new_binary(ND_ADD,
                 bits,
-                new_typed_num(mem->bit_width, ty_nuint, NULL),
+                new_typed_num(mem->bit_width, ty_uintptr, NULL),
                 NULL),
               node1, NULL),
             sz8, NULL),
@@ -2479,7 +2479,7 @@ static Type *struct_decl(Token **rest, Token *tok) {
         bits = reduce_node(
           new_binary(ND_ADD,
             bits,
-            new_typed_num(mem->bit_width, ty_nuint, NULL),
+            new_typed_num(mem->bit_width, ty_uintptr, NULL),
             NULL));
       }
     } else {
@@ -2532,8 +2532,8 @@ static Type *union_decl(Token **rest, Token *tok) {
     return ty;
 
   // We need to compute the alignment and the size though.
-  Node *node0 = new_typed_num(0, ty_nuint, NULL);   // (size_t)0
-  Node *node1 = new_typed_num(1, ty_nuint, NULL);   // (size_t)1
+  Node *node0 = new_typed_num(0, ty_uintptr, NULL);   // (size_t)0
+  Node *node1 = new_typed_num(1, ty_uintptr, NULL);   // (size_t)1
   Node *size = node0;
   Node *align = node1;
   bool is_overall_fixed_size = true;

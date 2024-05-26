@@ -351,7 +351,7 @@ typedef enum {
   TY_SHORT,
   TY_INT,
   TY_LONG,
-  TY_NINT,
+  TY_INTPTR,
   TY_FLOAT,
   TY_DOUBLE,
   TY_FLOAT_COMPLEX,
@@ -453,8 +453,8 @@ extern Type *ty_ushort;
 extern Type *ty_uint;
 extern Type *ty_ulong;
 
-extern Type *ty_nint;
-extern Type *ty_nuint;
+extern Type *ty_intptr;
+extern Type *ty_uintptr;
 
 extern Type *ty_float;
 extern Type *ty_double;

@@ -25,8 +25,8 @@ Type *ty_ushort = &(Type){TY_SHORT};
 Type *ty_uint = &(Type){TY_INT};
 Type *ty_ulong = &(Type){TY_LONG};
 
-Type *ty_nint = &(Type){TY_NINT};
-Type *ty_nuint = &(Type){TY_NINT};
+Type *ty_intptr = &(Type){TY_INTPTR};
+Type *ty_uintptr = &(Type){TY_INTPTR};
 
 Type *ty_float = &(Type){TY_FLOAT};
 Type *ty_double = &(Type){TY_DOUBLE};
@@ -45,12 +45,12 @@ static void init_type(Type *ty, Node *sz, bool is_unsigned, bool is_fixed_size) 
 void init_type_system(MemoryModel mm) {
   mem_model = mm;
 
-  size0_node->ty = ty_nuint;
-  size1_node->ty = ty_nuint;
-  size2_node->ty = ty_nuint;
-  size4_node->ty = ty_nuint;
-  size8_node->ty = ty_nuint;
-  size16_node->ty = ty_nuint;
+  size0_node->ty = ty_uintptr;
+  size1_node->ty = ty_uintptr;
+  size2_node->ty = ty_uintptr;
+  size4_node->ty = ty_uintptr;
+  size8_node->ty = ty_uintptr;
+  size16_node->ty = ty_uintptr;
 
   switch (mem_model) {
   case M32:
@@ -67,13 +67,13 @@ void init_type_system(MemoryModel mm) {
     break;
   default:
     sizenint_node->kind = ND_SIZEOF;
-    sizenint_node->sizeof_ty = ty_nint;
+    sizenint_node->sizeof_ty = ty_intptr;
     sizenuint_node->kind = ND_SIZEOF;
-    sizenuint_node->sizeof_ty = ty_nuint;
+    sizenuint_node->sizeof_ty = ty_uintptr;
   }
 
-  sizenint_node->ty = ty_nuint;    // size_t
-  sizenuint_node->ty = ty_nuint;   // size_t
+  sizenint_node->ty = ty_uintptr;    // size_t
+  sizenuint_node->ty = ty_uintptr;   // size_t
 
   sizevalist_node->kind = ND_SIZEOF;
   sizevalist_node->sizeof_ty = ty_va_list;
@@ -92,8 +92,8 @@ void init_type_system(MemoryModel mm) {
   init_type(ty_ulong, size8_node, true, true);
 
   bool is_pointer_fixed_size = mem_model != AnyCPU;
-  init_type(ty_nint, sizenint_node, false, is_pointer_fixed_size);
-  init_type(ty_nuint, sizenuint_node, true, is_pointer_fixed_size);
+  init_type(ty_intptr, sizenint_node, false, is_pointer_fixed_size);
+  init_type(ty_uintptr, sizenuint_node, true, is_pointer_fixed_size);
 
   init_type(ty_float, size4_node, false, true);
   init_type(ty_double, size8_node, false, true);
@@ -115,7 +115,7 @@ static Type *new_type(TypeKind kind) {
 bool is_integer(Type *ty) {
   TypeKind k = ty->kind;
   return k == TY_BOOL || k == TY_CHAR || k == TY_SHORT ||
-         k == TY_INT  || k == TY_LONG || k == TY_NINT || k == TY_ENUM;
+         k == TY_INT  || k == TY_LONG || k == TY_INTPTR || k == TY_ENUM;
 }
 
 bool is_flonum(Type *ty) {
@@ -148,7 +148,7 @@ bool is_compatible(Type *t1, Type *t2) {
   case TY_SHORT:
   case TY_INT:
   case TY_LONG:
-  case TY_NINT:
+  case TY_INTPTR:
     return t1->is_unsigned == t2->is_unsigned;
   case TY_FLOAT:
   case TY_DOUBLE:
@@ -192,12 +192,12 @@ Type *pointer_to(Type *base, Token *tok) {
   ty->is_unsigned = true;
   switch (mem_model) {
   case M32:
-    ty->size = new_typed_num(4, ty_nint, tok);
+    ty->size = new_typed_num(4, ty_intptr, tok);
     ty->align = ty->size;
     ty->is_fixed_size = true;
     break;
   case M64:
-    ty->size = new_typed_num(8, ty_nint, tok);
+    ty->size = new_typed_num(8, ty_intptr, tok);
     ty->align = ty->size;
     ty->is_fixed_size = true;
     break;
@@ -259,7 +259,7 @@ static int get_type_comparer(Type *ty) {
     return 3;
   case TY_LONG:
     return 4;
-  case TY_NINT:
+  case TY_INTPTR:
   case TY_PTR:
   case TY_FUNC:
     return 5;

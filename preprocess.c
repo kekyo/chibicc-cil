@@ -1059,37 +1059,31 @@ static char *format_time(struct tm *tm) {
 
 void init_macros(void) {
   // Define predefined macros
-  switch (mem_model) {
-    case M64:
-      define_macro("_LP64", "1");
-      define_macro("__LP64__", "1");
-      define_macro("__SIZEOF_POINTER__", "8");
-      define_macro("__SIZEOF_PTRDIFF_T__", "8");
-      define_macro("__SIZEOF_SIZE_T__", "8");
-      define_macro("__SIZE_TYPE__", "unsigned long");
-      break;
-    case M32:
-      define_macro("_ILP32", "1");
-      define_macro("__ILP32__", "1");
-      define_macro("__SIZEOF_POINTER__", "4");
-      define_macro("__SIZEOF_PTRDIFF_T__", "4");
-      define_macro("__SIZEOF_SIZE_T__", "4");
-      define_macro("__SIZE_TYPE__", "unsigned int");
-      break;
-    default:
-      define_macro("__SIZEOF_POINTER__", "(sizeof(void *))");
-      define_macro("__SIZEOF_PTRDIFF_T__", "(sizeof(void *))");
-      define_macro("__SIZEOF_SIZE_T__", "(sizeof(__builtin_nuint))");
-      define_macro("__SIZE_TYPE__", "__builtin_nuint");
-      break;
-  }
-  define_macro("__SIZEOF_LONG__", "8");
-  define_macro("__SIZEOF_DOUBLE__", "8");
-  define_macro("__SIZEOF_FLOAT__", "4");
-  define_macro("__SIZEOF_INT__", "4");
-  define_macro("__SIZEOF_LONG_DOUBLE__", "8");
-  define_macro("__SIZEOF_LONG_LONG__", "8");
-  define_macro("__SIZEOF_SHORT__", "2");
+  define_macro("__SIZEOF_INT8_T__", "1");
+  define_macro("__SIZEOF_UINT8_T__", "1");
+  define_macro("__SIZEOF_INT16_T__", "2");
+  define_macro("__SIZEOF_UINT16_T__", "2");
+  define_macro("__SIZEOF_INT32_T__", "4");
+  define_macro("__SIZEOF_UINT32_T__", "4");
+  define_macro("__SIZEOF_INT64_T__", "8");
+  define_macro("__SIZEOF_UINT64_T__", "8");
+
+  define_macro("__INT8_MAX__", "(127)");
+  define_macro("__INT8_MIN__", "(-128)");
+  define_macro("__UINT8_MAX__", "(255)");
+  define_macro("__INT16_MAX__", "(32767)");
+  define_macro("__INT16_MIN__", "(-32768)");
+  define_macro("__UINT16_MAX__", "(65535)");
+  define_macro("__INT32_MAX__", "(2147483647L)");
+  define_macro("__INT32_MIN__", "(-2147483647L-1)");
+  define_macro("__UINT32_MAX__", "(4294967295U)");
+  define_macro("__INT64_MAX__", "(9223372036854775807L)");
+  define_macro("__INT64_MIN__", "(-9223372036854775807L-1L)");
+  define_macro("__UINT64_MAX__", "(18446744073709551615UL)");
+  define_macro("__INTMAX_MAX__", "__INT64_MAX__");
+  define_macro("__INTMAX_MIN__", "__INT64_MIN__");
+  define_macro("__UINTMAX_MAX__", "__UINT64_MAX__");
+
   define_macro("__INT8_TYPE__", "signed char");
   define_macro("__UINT8_TYPE__", "unsigned char");
   define_macro("__INT16_TYPE__", "short int");
@@ -1098,8 +1092,72 @@ void init_macros(void) {
   define_macro("__UINT32_TYPE__", "unsigned int");
   define_macro("__INT64_TYPE__", "long int");
   define_macro("__UINT64_TYPE__", "long unsigned int");
-  define_macro("__INTPTR_TYPE__", "__builtin_nint");
-  define_macro("__UINTPTR_TYPE__", "__builtin_nuint");
+  define_macro("__INTMAX_TYPE__", "__INT64_TYPE__");
+  define_macro("__UINTMAX_TYPE__", "__UINT64_TYPE__");
+  define_macro("__SIZE_TYPE__", "__UINTPTR_TYPE__");
+  define_macro("__SSIZE_TYPE__", "__INTPTR_TYPE__");
+  define_macro("__PTRDIFF_TYPE__", "__INTPTR_TYPE__");
+  define_macro("__WCHAR_TYPE__", "__UINT32_TYPE__");
+  define_macro("__WINT_TYPE__", "__UINT32_TYPE__");
+
+  switch (mem_model) {
+    case M64:
+      define_macro("_LP64", "1");
+      define_macro("__LP64__", "1");
+      define_macro("__SIZEOF_INTPTR__", "__SIZEOF_INT64_T__");
+      define_macro("__SIZEOF_UINTPTR__", "__SIZEOF_INT64_T__");
+      define_macro("__INTPTR_MAX__", "__INT64_MAX__");
+      define_macro("__INTPTR_MIN__", "__INT64_MIN__");
+      define_macro("__UINTPTR_MAX__", "__UINT64_MAX__");
+      define_macro("__INTPTR_TYPE__", "__INT64_TYPE__");
+      define_macro("__UINTPTR_TYPE__", "__UINT64_TYPE__");
+      break;
+    case M32:
+      define_macro("_ILP32", "1");
+      define_macro("__ILP32__", "1");
+      define_macro("__SIZEOF_INTPTR__", "__SIZEOF_INT32_T__");
+      define_macro("__SIZEOF_UINTPTR__", "__SIZEOF_UINT32_T__");
+      define_macro("__INTPTR_MAX__", "__INT32_MAX__");
+      define_macro("__INTPTR_MIN__", "__INT32_MIN__");
+      define_macro("__UINTPTR_MAX__", "__UINT32_MAX__");
+      define_macro("__INTPTR_TYPE__", "__INT32_TYPE__");
+      define_macro("__UINTPTR_TYPE__", "__UINT32_TYPE__");
+      break;
+    default:
+      define_macro("__SIZEOF_INTPTR__", "__builtin_sizeof_intptr");
+      define_macro("__SIZEOF_UINTPTR__", "__builtin_sizeof_uintptr");
+      define_macro("__INTPTR_MAX__", "__builtin_intptr_max");
+      define_macro("__INTPTR_MIN__", "__builtin_intptr_min");
+      define_macro("__UINTPTR_MAX__", "__builtin_uintptr_max");
+      define_macro("__INTPTR_TYPE__", "__builtin_intptr");
+      define_macro("__UINTPTR_TYPE__", "__builtin_uintptr");
+      break;
+  }
+
+  define_macro("__SIZEOF_POINTER__", "__SIZEOF_UINTPTR__");
+  define_macro("__SIZEOF_PTRDIFF_T__", "__SIZEOF_INTPTR__");
+  define_macro("__SIZEOF_SIZE_T__", "__SIZEOF_UINTPTR__");
+  define_macro("__SIZEOF_SSIZE_T__", "__SIZEOF_INTPTR__");
+
+  define_macro("__SIZEOF_LONG__", "__SIZEOF_INT64_T__");
+  define_macro("__SIZEOF_INT__", "__SIZEOF_INT32_T__");
+  define_macro("__SIZEOF_LONG_LONG__", "__SIZEOF_INT64_T__");
+  define_macro("__SIZEOF_SHORT__", "__SIZEOF_INT16_T__");
+  
+  define_macro("__SIZEOF_DOUBLE__", "8");
+  define_macro("__SIZEOF_FLOAT__", "4");
+  define_macro("__SIZEOF_LONG_DOUBLE__", "8");
+
+  define_macro("__SIZE_MAX__", "__UINTPTR_MAX__");
+  define_macro("__SSIZE_MAX__", "__INTPTR_MAX__");
+  define_macro("__SSIZE_MIN__", "__INTPTR_MIN__");
+  define_macro("__PTRDIFF_MAX__", "__INTPTR_MAX__");
+  define_macro("__PTRDIFF_MIN__", "__INTPTR_MIN__");
+  define_macro("__WCHAR_MAX__", "__UINT32_MAX__");
+  define_macro("__WCHAR_MIN__", "(0U)");
+  define_macro("__WINT_MAX__", "__UINT32_MAX__");
+  define_macro("__WINT_MIN__", "(0U)");
+
   define_macro("__IEEE_LITTLE_ENDIAN", "1");
   define_macro("__C99_MACRO_WITH_VA_ARGS", "1");
   define_macro("__STDC_HOSTED__", "1");

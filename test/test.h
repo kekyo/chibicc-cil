@@ -1,6 +1,6 @@
-typedef __builtin_nint intptr_t;
-typedef __builtin_nuint uintptr_t;
-typedef __builtin_nuint size_t;
+typedef __builtin_intptr intptr_t;
+typedef __builtin_uintptr uintptr_t;
+typedef __builtin_uintptr size_t;
 typedef __builtin_va_list va_list;
 
 extern void __builtin_trap();

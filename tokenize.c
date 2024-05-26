@@ -170,7 +170,7 @@ static bool is_keyword(Token *tok) {
       "struct", "union", "short", "long", "void", "typedef", "_Bool",
       "enum", "static", "goto", "break", "continue", "switch", "case",
       "default", "extern", "_Alignof", "_Alignas", "do", "__builtin_va_list", "signed", "unsigned",
-      "__builtin_nint", "__builtin_nuint",
+      "__builtin_intptr", "__builtin_uintptr",
       "const", "volatile", "auto", "register", "restrict",
       "__restrict", "__restrict__", "_Noreturn", "float", "double",
       "typeof", "asm", "_Thread_local", "__thread", "_Complex",
