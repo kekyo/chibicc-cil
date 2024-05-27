@@ -262,6 +262,9 @@ typedef enum {
   ND_CAST,      // Type cast
   ND_MEMZERO,   // Zero-clear a stack variable
   ND_ASM,       // "asm"
+  ND_ADD_OVF,   // + Overflow checking
+  ND_SUB_OVF,   // - Overflow checking
+  ND_MUL_OVF,   // * Overflow checking
 } NodeKind;
 
 // AST node type
@@ -326,6 +329,9 @@ struct Node {
 
   // Sizeof
   Type *sizeof_ty;
+
+  // Result for overflow checked calculation
+  Node *res;
 };
 
 Node *new_node(NodeKind kind, Token *tok);

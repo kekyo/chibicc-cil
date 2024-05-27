@@ -139,6 +139,84 @@ int main() {
   //ASSERT(6, (long double)3*2);
   //ASSERT(5, (long double)3+2.0);
 
+  int rai1;
+  ASSERT(1, __builtin_add_overflow(1, 2, &rai1));
+  ASSERT(3, rai1);
+  int rai2;
+  ASSERT(0, __builtin_add_overflow(2147483647, 1, &rai2));
+  int rai3;
+  ASSERT(1, __builtin_add_overflow(2147483646, 1, &rai3));
+  ASSERT(2147483647, rai3);
+
+  long ral1;
+  ASSERT(1, __builtin_add_overflow(1L, 2L, &ral1));
+  ASSERT(3L, ral1);
+  long ral2;
+  ASSERT(0, __builtin_add_overflow(9223372036854775807L, 1L, &ral2));
+  long ral3;
+  ASSERT(1, __builtin_add_overflow(9223372036854775806L, 1L, &ral3));
+  ASSERT(9223372036854775807L, ral3);
+
+  unsigned int raui1;
+  ASSERT(1, __builtin_add_overflow(1U, 2U, &raui1));
+  ASSERT(3U, raui1);
+  unsigned int raui2;
+  ASSERT(0, __builtin_add_overflow(4294967295U, 1U, &raui2));
+  unsigned int raui3;
+  ASSERT(1, __builtin_add_overflow(4294967294U, 1U, &raui3));
+  ASSERT(4294967295U, raui3);
+
+  unsigned long raul1;
+  ASSERT(1, __builtin_add_overflow(1UL, 2UL, &raul1));
+  ASSERT(3UL, raul1);
+  unsigned long raul2;
+  ASSERT(0, __builtin_add_overflow(18446744073709551615UL, 1UL, &raul2));
+  unsigned long raul3;
+  ASSERT(1, __builtin_add_overflow(18446744073709551614UL, 1UL, &raul3));
+  ASSERT(18446744073709551615UL, raul3);
+
+  int rai4;
+  ASSERT(1, __builtin_add_overflow((short)1, 2, &rai4));
+  ASSERT(3, rai4);
+  int rai5;
+  ASSERT(1, __builtin_add_overflow(1, (short)2, &rai5));
+  ASSERT(3, rai5);
+
+  unsigned int rau4;
+  ASSERT(1, __builtin_add_overflow((unsigned short)1, 2U, &rau4));
+  ASSERT(3U, rau4);
+  unsigned int rau5;
+  ASSERT(1, __builtin_add_overflow(1U, (unsigned short)2, &rau5));
+  ASSERT(3U, rau5);
+
+  long ral4;
+  ASSERT(1, __builtin_add_overflow(1, 2L, &ral4));
+  ASSERT(3L, rau4);
+  long ral5;
+  ASSERT(1, __builtin_add_overflow(1L, 2, &ral5));
+  ASSERT(3L, rau5);
+
+  unsigned long raul4;
+  ASSERT(1, __builtin_add_overflow(1U, 2UL, &raul4));
+  ASSERT(3UL, raul4);
+  unsigned long raul5;
+  ASSERT(1, __builtin_add_overflow(1UL, 2U, &raul5));
+  ASSERT(3UL, raul5);
+
+  int rai6;
+  ASSERT(1, __builtin_sub_overflow(1, 3, &rai6));
+  ASSERT(-2, rai6);
+
+  unsigned int rau6;
+  ASSERT(0, __builtin_sub_overflow(1U, 3U, &rai6));
+
+  int rai7;
+  ASSERT(1, __builtin_mul_overflow(2, 3, &rai7));
+  ASSERT(6, rai7);
+
+  unsigned int rau7;
+  ASSERT(0, __builtin_mul_overflow(4294967295U, 2U, &rai7));
+
   printf("OK\n");
   return 0;
 }

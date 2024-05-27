@@ -1072,6 +1072,27 @@ static void gen_expr(Node *node, bool is_bottom, bool will_discard) {
   case ND_FUNCALL:
     gen_funcall(node, is_bottom, will_discard);
     return;
+  case ND_ADD_OVF:
+    gen_expr(node->lhs, is_bottom, will_discard);
+    gen_expr(node->rhs, false, will_discard);
+    gen_expr(node->res, false, will_discard);
+    if (!will_discard)
+      println("  call __baddovf%s%s", node->lhs->ty->is_unsigned ? "u" : "", node->lhs->ty->kind == TY_LONG ? "l" : "");
+    return;
+  case ND_SUB_OVF:
+    gen_expr(node->lhs, is_bottom, will_discard);
+    gen_expr(node->rhs, false, will_discard);
+    gen_expr(node->res, false, will_discard);
+    if (!will_discard)
+      println("  call __bsubovf%s%s", node->lhs->ty->is_unsigned ? "u" : "", node->lhs->ty->kind == TY_LONG ? "l" : "");
+    return;
+  case ND_MUL_OVF:
+    gen_expr(node->lhs, is_bottom, will_discard);
+    gen_expr(node->rhs, false, will_discard);
+    gen_expr(node->res, false, will_discard);
+    if (!will_discard)
+      println("  call __bmulovf%s%s", node->lhs->ty->is_unsigned ? "u" : "", node->lhs->ty->kind == TY_LONG ? "l" : "");
+    return;
   }
 
   gen_expr(node->lhs, is_bottom, will_discard);

@@ -204,6 +204,13 @@ bool equals_node(Node *lhs, Node *rhs) {
       return
         equals_node(lhs->lhs, rhs->lhs) &&
         equals_node(lhs->rhs, rhs->rhs);
+    case ND_ADD_OVF:
+    case ND_SUB_OVF:
+    case ND_MUL_OVF:
+      return
+        equals_node(lhs->lhs, rhs->lhs) &&
+        equals_node(lhs->rhs, rhs->rhs) &&
+        equals_node(lhs->res, rhs->res);
     case ND_NEG:
     case ND_NOT:
     case ND_BITNOT:
@@ -259,6 +266,10 @@ static bool is_immutable(Node *node) {
     case ND_ASSIGN:
     case ND_COMPLEX:
       return is_immutable(node->lhs) && is_immutable(node->rhs);
+    case ND_ADD_OVF:
+    case ND_SUB_OVF:
+    case ND_MUL_OVF:
+      return is_immutable(node->lhs) && is_immutable(node->rhs) && is_immutable(node->res);
     case ND_NEG:
     case ND_NOT:
     case ND_BITNOT:
@@ -430,6 +441,16 @@ static Node *reduce_(Node *node) {
     else if (lhs->kind != ND_NUM || rhs->kind != ND_NUM)
       return new_binary(ND_MOD, lhs, rhs, node->tok);
     break;
+  case ND_ADD_OVF:
+  case ND_SUB_OVF:
+  case ND_MUL_OVF: {
+    lhs = reduce(node->lhs);
+    rhs = reduce(node->rhs);
+    Node *res = reduce(node->res);
+    Node *n = new_binary(node->kind, lhs, rhs, node->tok);
+    n->res = res;
+    return n;
+  }
   case ND_BITAND:
     lhs = reduce(node->lhs);
     rhs = reduce(node->rhs);

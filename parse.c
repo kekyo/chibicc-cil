@@ -2784,6 +2784,30 @@ static Node *generic_selection(Token **rest, Token *tok) {
   return ret;
 }
 
+static Node *builtin_overflow(NodeKind kind, Token **rest, Token *tok, Token *start) {
+    tok = skip(tok->next, "(");
+    Node *lhs_arg = assign(&tok, tok);
+    add_type(lhs_arg);
+    tok = skip(tok, ",");
+    Node *rhs_arg = assign(&tok, tok);
+    add_type(rhs_arg);
+    tok = skip(tok, ",");
+    Node *res_arg = assign(&tok, tok);
+    add_type(res_arg);
+
+    if (!is_integer(lhs_arg->ty) || !is_integer(rhs_arg->ty) || res_arg->ty->kind != TY_PTR || !is_integer(res_arg->ty->base)) {
+      error_tok(tok, "invalid type combination on overflow checker");
+    }
+
+    *rest = skip(tok, ")");
+
+    Node *op = new_binary(kind, lhs_arg, rhs_arg, start);
+    op->res = res_arg;
+    add_type(op);
+
+    return op;
+}
+
 // primary = "(" "{" stmt+ "}" ")"
 //         | "(" expr ")"
 //         | "sizeof" "(" type-name ")"
@@ -2792,6 +2816,8 @@ static Node *generic_selection(Token **rest, Token *tok) {
 //         | "_Alignof" unary
 //         | "_Generic" generic-selection
 //         | "__builtin_types_compatible_p" "(" type-name, type-name, ")"
+//         | "__builtin_complex" "(" assign, assign ")"
+//         | "__builtin_add_overflow" "(" assign, assign, assign ")"
 //         | ident
 //         | str
 //         | num
@@ -2863,8 +2889,15 @@ static Node *primary(Token **rest, Token *tok) {
     *rest = skip(tok, ")");
 
     return new_complex(real_arg, imag_arg,
-      real_arg->ty->kind == TY_FLOAT ? ty_float_complex : ty_double_complex, tok);
+      real_arg->ty->kind == TY_FLOAT ? ty_float_complex : ty_double_complex, start);
   }
+
+  if (equal(tok, "__builtin_add_overflow"))
+    return builtin_overflow(ND_ADD_OVF, rest, tok, start);
+  if (equal(tok, "__builtin_sub_overflow"))
+    return builtin_overflow(ND_SUB_OVF, rest, tok, start);
+  if (equal(tok, "__builtin_mul_overflow"))
+    return builtin_overflow(ND_MUL_OVF, rest, tok, start);
 
   if (tok->kind == TK_IDENT) {
     // Variable or enum constant

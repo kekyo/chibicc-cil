@@ -358,6 +358,13 @@ void add_type(Node *node) {
     node->ty = ty;
     return;
   }
+  case ND_ADD_OVF:
+  case ND_SUB_OVF:
+  case ND_MUL_OVF:
+    usual_arith_conv(&node->lhs, &node->rhs, node->tok);
+    add_type(node->res);
+    node->ty = ty_bool;
+    return;
   case ND_ASSIGN:
     if (node->lhs->ty->kind == TY_ARRAY)
       error_tok(node->lhs->tok, "not an lvalue");
