@@ -179,9 +179,10 @@ static void gen_addr(Node *node, bool is_bottom) {
   case ND_VAR:
   case ND_SWITCH:
   case ND_MEMZERO:
+    char *var_name = node->var->exact_name ? node->var->exact_name : node->var->name;
     if (node->var->ty->kind == TY_FUNC) {
       // Function symbol
-      println("  ldftn %s", node->var->name);
+      println("  ldftn %s", var_name);
       return;
     }
     switch (node->var->kind) {
@@ -192,10 +193,10 @@ static void gen_addr(Node *node, bool is_bottom) {
         //   To deal with this problem, we use calloc in the type initializer
         //   to store true fixed addresses.
         if (node->var->is_tls) {
-          println("  ldsfld __tls_%s__", node->var->name);
+          println("  ldsfld __tls_%s__", var_name);
           println("  call __get_tls_value");
         } else
-          println("  ldsfld %s", node->var->name);
+          println("  ldsfld %s", var_name);
         return;
       case OB_LOCAL:
         // Local variable
@@ -683,7 +684,8 @@ static void gen_funcall(Node *node, bool is_bottom, bool will_discard) {
 
   // Direct call
   if (node->lhs->kind == ND_VAR && node->lhs->var->ty->kind == TY_FUNC) {
-    println("  call %s", node->lhs->var->name);
+    println("  call %s", node->lhs->var->exact_name ? node->lhs->var->exact_name : node->lhs->var->name);
+  // Indirect call
   } else {
     gen_expr(node->lhs, is_bottom, false);
     println("  calli %s", get_cil_callsite(node));

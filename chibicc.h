@@ -196,6 +196,7 @@ struct Obj {
   bool is_function;
   bool is_definition;
   bool is_static;
+  char *exact_name;
 
   // Global variable
   bool is_tls;

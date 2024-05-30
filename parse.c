@@ -1408,7 +1408,7 @@ static bool is_typename(Token *tok) {
   return hashmap_get2(&map, tok->loc, tok->len) || find_typedef(tok);
 }
 
-// asm-stmt = "asm" ("volatile" | "inline")* "(" string-literal ")"
+// asm-stmt = "__asm__" ("volatile" | "inline")* "(" string-literal ")"
 static Node *asm_stmt(Token **rest, Token *tok) {
   Node *node = new_node(ND_ASM, tok);
   tok = tok->next;
@@ -1432,7 +1432,7 @@ static Node *asm_stmt(Token **rest, Token *tok) {
 //      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
 //      | "do" stmt "while" "(" expr ")" ";"
-//      | "asm" asm-stmt
+//      | "__asm__" asm-stmt
 //      | "goto" ident ";"
 //      | "break" ";"
 //      | "continue" ";"
@@ -1619,7 +1619,7 @@ static Node *stmt(Token **rest, Token *tok) {
     return node;
   }
 
-  if (equal(tok, "asm"))
+  if (equal(tok, "__asm__"))
     return asm_stmt(rest, tok);
 
   if (equal(tok, "goto")) {
@@ -3031,15 +3031,31 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   if (!ty->name)
     error_tok(ty->name_pos, "function name omitted");
 
+  // asm declaration
+  char *exact_name = NULL;
+  Token *asm_tok = tok;
+  if (consume(&tok, tok, "__asm__")) {
+    tok = skip(tok, "(");
+    if (tok->kind != TK_STR || tok->ty->base->kind != TY_CHAR)
+      error_tok(tok, "symbol name required");
+    exact_name = tok->str;
+    tok = tok->next;
+    tok = skip(tok, ")");
+  }
+
   Obj *fn = new_gvar(get_ident(ty->name), ty);
   fn->is_function = true;
   fn->is_definition = !(consume(&tok, tok, ";") || consume(&tok, tok, ","));
   fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
   fn->is_inline = attr->is_inline;
   fn->is_root = !(fn->is_static && fn->is_inline);
+  fn->exact_name = exact_name;
 
   if (!fn->is_definition)
     return tok;
+
+  if (exact_name)
+    error_tok(asm_tok, "could not apply exact symbol name");
 
   current_fn = fn;
   locals = NULL;
@@ -3081,15 +3097,32 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
     if (!ty->name)
       error_tok(ty->name_pos, "variable name omitted");
 
+    // asm declaration
+    char *exact_name = NULL;
+    Token *asm_tok = tok;
+    if (consume(&tok, tok, "__asm__")) {
+      tok = skip(tok, "(");
+      if (tok->kind != TK_STR || tok->ty->base->kind != TY_CHAR)
+        error_tok(tok, "symbol name required");
+      exact_name = tok->str;
+      tok = tok->next;
+      tok = skip(tok, ")");
+    }
+
     Obj *var = new_gvar(get_ident(ty->name), ty);
     var->is_definition = !attr->is_extern;
     var->is_static = attr->is_static;
     var->is_tls = attr->is_tls;
     if (attr->align)
       var->align = attr->align;
+    var->exact_name = exact_name;
 
-    if (equal(tok, "="))
+    if (equal(tok, "=")) {
+      if (exact_name)
+        error_tok(asm_tok, "could not apply exact symbol name");
+        
       gvar_initializer(&tok, tok->next, var);
+    }
   }
   return tok;
 }
