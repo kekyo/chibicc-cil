@@ -16,7 +16,7 @@ extern void __builtin_va_copy(va_list *dest, va_list *src);
 #define __GNUC_VA_LIST 1
 typedef va_list __gnuc_va_list;
 
-#include <stdio.h>
+typedef struct FILE FILE;
 
 int vsprintf(char *buf, char *fmt, va_list ap);
 int vfprintf(FILE *fp, char *fmt, va_list ap);

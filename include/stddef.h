@@ -12,6 +12,7 @@ typedef __builtin_intptr ssize_t;
 typedef __builtin_intptr ptrdiff_t;
 
 typedef unsigned int wchar_t;
+typedef unsigned int wint_t;
 typedef long max_align_t;
 
 extern __builtin_uintptr __builtin_sizeof_intptr;

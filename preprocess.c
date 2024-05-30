@@ -1172,6 +1172,7 @@ void init_macros(void) {
   define_macro("__cil", "1");
   define_macro("__cil__", "1");
   define_macro("__chibicc__", "1");
+  define_macro("__chibild__", "1");
   define_macro("__const__", "const");
   define_macro("__inline__", "inline");
   define_macro("__signed__", "signed");

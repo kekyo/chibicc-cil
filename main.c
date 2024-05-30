@@ -764,10 +764,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  if (input_paths.len > 1 && opt_o && (opt_c || opt_S || opt_E))
-    error("cannot specify '-o' with '-c,' '-S' or '-E' with multiple files");
-
   StringArray ld_args = {};
+  char *output = NULL;
 
   for (int i = 0; i < input_paths.len; i++) {
     char *input = input_paths.data[i];
@@ -792,7 +790,9 @@ int main(int argc, char **argv) {
       continue;
     }
 
-    char *output;
+    if (output != NULL && opt_o && (opt_c || opt_S || opt_E))
+      error("cannot specify '-o' with '-c,' '-S' or '-E' with multiple files");
+
     if (opt_o)
       output = opt_o;
     else if (opt_S)

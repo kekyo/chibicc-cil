@@ -7,5 +7,7 @@ int isalpha(int c);
 int isdigit(int c);
 int isxdigit(int c);
 int isalnum(int c);
+int isupper(int c);
+int islower(int c);
 
 #endif
