@@ -658,9 +658,10 @@ static char *find_chibicc_libpath(char *argv0) {
       libdir = format("%s/lib", dirname(strdup(argv0)));
   }
 
-  char *libcpath = format("%s/libc.dll", libdir);
+  char *libcpath1 = format("%s/libc.dll", libdir);
+  char *libcpath2 = format("%s/libc.a", libdir);
   char *paths[] = {
-    libcpath
+    libcpath1, libcpath2
   };
 
   for (int i = 0; i < sizeof(paths) / sizeof(*paths); i++) {
@@ -711,6 +712,7 @@ static void run_linker(char *argv0, StringArray *inputs, char *output) {
 
   strarray_push(&arr, "-lSystem.Private.CoreLib");
   strarray_push(&arr, "-lc");
+  strarray_push(&arr, "-lgloss");
 
   for (int i = 0; i < inputs->len; i++)
     strarray_push(&arr, inputs->data[i]);
