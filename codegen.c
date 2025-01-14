@@ -178,7 +178,7 @@ static void gen_addr(Node *node, bool is_bottom) {
   switch (node->kind) {
   case ND_VAR:
   case ND_SWITCH:
-  case ND_MEMZERO:
+  case ND_MEMZERO: {
     char *var_name = node->var->exact_name ? node->var->exact_name : node->var->name;
     if (node->var->ty->kind == TY_FUNC) {
       // Function symbol
@@ -209,6 +209,7 @@ static void gen_addr(Node *node, bool is_bottom) {
     }
     unreachable();
     return;
+  }
   case ND_DEREF:
     gen_expr(node->lhs, is_bottom, false);
     return;
